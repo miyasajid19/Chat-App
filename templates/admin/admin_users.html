@@ -8,6 +8,10 @@
     <title>Manage Users - Admin</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
+     <!-- Google Fonts (Optional) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
@@ -15,8 +19,8 @@
         <div class="header">
             <h1>Manage Users</h1>
             <div class="header-links">
-                <span>Admin: {{ username }}</span> |
-                <a href="{{ url_for('admin_dashboard') }}">Admin Home</a> |
+                <span>Admin: {{ username | e }}</span> |
+                <a href="{{ url_for('admin_dashboard') }}" title="Back to Admin Dashboard">Admin Home</a> |
                 <a href="{{ url_for('dashboard') }}">Main Dashboard</a> |
                 <a href="{{ url_for('logout') }}">Logout</a>
             </div>
@@ -26,8 +30,9 @@
             {% include 'includes/_flash_messages.html' %}
 
             <h2>User List</h2>
-            <p>Manage registered user accounts. You cannot delete your own account or other administrators.</p>
+            <p>Manage registered user accounts. Actions are restricted for your own account and other administrators.</p>
 
+            {# Check if the users list (passed from Flask) is not empty #}
             {% if users %}
             <div class="table-responsive section-box">
                 <table class="user-table">
@@ -36,6 +41,7 @@
                             <th>ID</th>
                             <th>Username</th>
                             <th>Email</th>
+                            <th>Role</th> {# Added Role Column #}
                             <th>Registered On</th>
                             <th>Actions</th>
                         </tr>
@@ -44,37 +50,52 @@
                         {% for user in users %}
                         <tr>
                             <td>{{ user.id }}</td>
-                            <td>{{ user.name | e }}</td>
+                            <td>{{ user.name | e }}</td> {# Escape user input #}
                             <td>{{ user.email | e }}</td>
+                            <td>
+                                {% if user.is_admin %}
+                                    <span style="color: var(--danger-color); font-weight: bold;">Admin</span>
+                                {% else %}
+                                    Regular
+                                {% endif %}
+                            </td>
+                            {# Format timestamp nicely, handle None #}
                             <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else 'N/A' }}</td>
                             <td class="actions">
-                                {# Only allow deleting non-admin users #}
-                                {% if not user.is_admin %}
-                                <form action="{{ url_for('admin_delete_user', user_id=user.id) }}" method="post"
-                                    onsubmit="return confirm('Are you sure you want to PERMANENTLY delete user \'{{ user.name | escape }}\'? This cannot be undone.');">
-                                    <button type="submit" class="btn btn-danger">Delete</button>
-                                </form>
+                                {# Conditional logic for actions based on user role and self #}
+                                {% if user.id == current_user_id %}
+                                    <span class="table-note">(Your Account)</span>
+                                {% elif user.is_admin %}
+                                     <span class="table-note">(Admin - No Actions)</span>
                                 {% else %}
-                                <!-- No actions for other admins -->
-                                <span style="color: var(--muted-color); font-style: italic;">(Admin)</span>
+                                    {# Actions for regular users (not self) #}
+                                    {# Delete User Form #}
+                                    <form action="{{ url_for('admin_delete_user', user_id=user.id) }}" method="post"
+                                        onsubmit="return confirm('Are you absolutely sure you want to PERMANENTLY delete user \'{{ user.name | escape | replace("'", "\\'") }}\'? This deletes the account and disassociates messages. This CANNOT be undone.');">
+                                        <button type="submit" class="btn btn-danger btn-sm" title="Delete User {{ user.name | e }}">Delete</button>
+                                    </form>
+                                    {# Add Edit User button/link (placeholder) #}
+                                    {# <a href="{{ url_for('admin_edit_user', user_id=user.id) }}" class="btn btn-secondary btn-sm" title="Edit User {{ user.name | e }}">Edit</a> #}
                                 {% endif %}
-                                <!-- Add Update/Edit buttons/links here later -->
-                                {# <a href="{{ url_for('admin_edit_user', user_id=user.id) }}"
-                                    class="btn btn-secondary btn-sm">Edit</a> #}
                             </td>
                         </tr>
-                        {% endfor %}
+                        {% endfor %} {# End of user loop #}
                     </tbody>
                 </table>
-            </div>
+            </div> {# End of table-responsive #}
             {% else %}
+             {# Message shown if users list is empty #}
             <div class="section-box">
-                <p>No other users found.</p>
+                <p>No users found matching the criteria (other than potentially yourself).</p>
             </div>
-            {% endif %}
+            {% endif %} {# End of users check #}
 
-        </div>
-    </div>
+             <div class="form-links" style="margin-top: 20px;"> {# Add link back to Admin Dash #}
+                 <a href="{{ url_for('admin_dashboard') }}">Back to Admin Dashboard</a>
+             </div>
+
+        </div> {# End of main #}
+    </div> {# End of container #}
 </body>
 
 </html>

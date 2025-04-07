@@ -8,16 +8,21 @@
     <title>500 Server Error - Chat App</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
+    <!-- Google Fonts (Optional) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container error-container">
         <div class="header"><h1>500 - Internal Server Error</h1></div>
         <div class="main">
-            <p>Oops! Something went wrong on our end.</p>
+            <p style="font-size: 1.1em; color: var(--muted-color);">Oops! Something went wrong on our end.</p>
             {% if error_message %}
-                <p><strong>Details:</strong> {{ error_message }}</p>
+                <p><strong>Details:</strong> <span style="color: var(--danger-color);">{{ error_message }}</span></p>
+            {% else %}
+                <p>We've logged the issue and are working to fix it. Please try again later.</p>
             {% endif %}
-            <p>We've been notified and are working to fix it. Please try again later.</p>
              <div class="error-actions">
                 <a href="{{ url_for('home') }}" class="btn btn-primary">Go to Homepage</a>
                  {% if 'user_id' in session %}

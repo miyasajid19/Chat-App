@@ -1,4 +1,4 @@
-!-- START OF FILE chatroom.html -->
+<!-- START OF FILE chatroom.html -->
 
 <!DOCTYPE html>
 <html lang="en">
@@ -9,93 +9,114 @@
     <title>Chat Room - {{ room_code }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
+    <!-- Google Fonts (Optional) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
     <div class="container chat-container">
         <div class="header">
+            <div class="chat-header-info">
+                <!-- User Count Display -->
+                Users: <span id="user-count-display" class="user-count-display">?</span>
+            </div>
             <h1>Private Chat</h1>
             <div class="header-links">
-                <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('dashboard') }}" title="Leave Room & Go to Dashboard">Dashboard</a>
             </div>
         </div>
         <div class="main">
+            <!-- Display Room Code prominently -->
             <h2 class="room-code-display">Room Code: <span class="code">{{ room_code }}</span></h2>
 
+            <!-- Messages Area -->
             <div class="messages" id="messages">
-                <!-- Messages loaded here -->
+                <!-- System message area/Initial loading message -->
+                <div class="system-message status-indicator">Connecting...</div>
             </div>
 
-            <!-- Flash Messages Area within chat -->
+            <!-- Floating Flash Messages Area (for SocketIO errors etc.) -->
             <div id="chat-flash-messages"></div>
 
-            <div class="send_message">
+            <!-- Message Input Area -->
+            <form class="send_message" id="message-form">
                 <label for="message" class="sr-only">Message:</label>
-                <textarea id="message" placeholder="Type your message..." aria-label="Type your message"
-                    rows="1"></textarea>
-                <button type="button" id="send-btn" aria-label="Send Message">
+                <textarea id="message" name="message" placeholder="Type your message..." aria-label="Type your message"
+                    rows="1" disabled></textarea> {# Start disabled until connected #}
+                <button type="submit" id="send-btn" aria-label="Send Message" disabled> {# Start disabled #}
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                         class="bi bi-send-fill" viewBox="0 0 16 16">
                         <path
                             d="M15.964.686a.5.5 0 0 0-.65-.65L.767 5.855H.766l-.452.18a.5.5 0 0 0-.082.887l.41.26.001.002 4.995 3.178 3.178 4.995.002.001.26.41a.5.5 0 0 0 .886-.083l6-15Zm-1.833 1.89L6.637 10.07l-.215-.338a.5.5 0 0 0-.154-.154l-.338-.215 7.494-7.494 1.178-.471-.47 1.178Z" />
                     </svg>
                 </button>
-            </div>
+            </form>
         </div>
     </div>
 
-    <!-- Include Socket.IO Client Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
+    <!-- Socket.IO Client Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
 
-    <!-- Chat Room JavaScript (Includes History Handling) -->
+    <!-- Chat Room JavaScript -->
     <script type="text/javascript">
         // --- Configuration ---
-        const currentUser = "{{ username }}"; // Username passed from Flask
-        const roomCode = "{{ room_code }}";   // Room code passed from Flask
+        const currentUser = "{{ username | e }}"; // Escaped username from Flask
+        const roomCode = "{{ room_code | e }}";   // Escaped room code from Flask
 
         // --- DOM Elements ---
-        const socketio = io(); // Connect automatically
+        const socketio = io(); // Auto-connect
         const messageContainer = document.getElementById("messages");
         const messageInput = document.getElementById("message");
         const sendButton = document.getElementById("send-btn");
-        const flashContainer = document.getElementById("chat-flash-messages");
+        const messageForm = document.getElementById("message-form");
+        const chatFlashContainer = document.getElementById("chat-flash-messages");
+        const userCountDisplay = document.getElementById("user-count-display");
 
         // --- Helper Functions ---
         const formatTimestamp = (isoString) => {
             if (!isoString) return '';
             try {
+                // Use browser's locale settings for time formatting
                 const date = new Date(isoString);
-                if (isNaN(date.getTime())) { console.warn("Invalid timestamp received:", isoString); return ''; }
-                return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            } catch (e) { console.error("Error formatting timestamp:", isoString, e); return ''; }
+                return isNaN(date.getTime()) ? '' : date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            } catch (e) { console.error("Timestamp format error:", isoString, e); return ''; }
         };
+
         const sanitize = (text) => {
-            const temp = document.createElement('div'); temp.textContent = text; return temp.innerHTML;
+            // Basic sanitation: replace HTML brackets to prevent XSS
+            // For more robust sanitation, consider a library like DOMPurify if needed.
+            if (typeof text !== 'string') text = String(text);
+            return text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
         };
-        const createMessageElement = (name, msg, timestamp, userId, isSystem = false) => {
+
+        const createMessageElement = (msgData) => {
+            const { name, message, timestamp, userId, isSystem = false } = msgData;
             const messageElement = document.createElement("div");
+            const safeName = sanitize(name);
+            const safeMsg = sanitize(message); // Sanitize message content
+            const formattedTime = formatTimestamp(timestamp);
+
             messageElement.classList.add("message-item");
-            const safeName = sanitize(name), safeMsg = sanitize(msg), formattedTime = formatTimestamp(timestamp);
 
             if (isSystem) {
                 messageElement.classList.add("system-message");
-                // System messages have simpler structure (no bubble)
                 messageElement.innerHTML = `<span class="message-content">${safeMsg}</span>`;
-                // Optionally add timestamp for system messages if needed
-                // messageElement.innerHTML += `<span class="message-timestamp">${formattedTime}</span>`;
+                // Note: System messages have animation via the class directly
             } else {
                 const messageBubble = document.createElement("div");
                 messageBubble.classList.add("message-bubble");
 
-                // Always create sender span, but hide for sent messages via CSS
-                const senderSpan = `<strong class="message-sender">${safeName}</strong>`;
-                const contentSpan = `<span class="message-content">${safeMsg}</span>`; // Use safeMsg here
+                // Conditionally add sender name for received messages
+                const senderSpan = (name !== currentUser) ? `<strong class="message-sender">${safeName}</strong>` : '';
+                const contentSpan = `<span class="message-content">${safeMsg}</span>`;
                 messageBubble.innerHTML = senderSpan + contentSpan;
 
                 const timestampSpan = `<span class="message-timestamp">${formattedTime}</span>`;
 
                 messageElement.appendChild(messageBubble);
-                messageElement.insertAdjacentHTML('beforeend', timestampSpan); // Add timestamp after bubble
+                messageElement.insertAdjacentHTML('beforeend', timestampSpan); // Timestamp below bubble
 
                 if (name === currentUser) {
                     messageElement.classList.add("sent-message");
@@ -105,171 +126,165 @@
             }
 
             messageContainer.appendChild(messageElement);
-            scrollToBottom(); // Scroll after adding any message
+             // Animation handled by CSS via message-item opacity + transform + keyframes
         };
 
 
         const scrollToBottom = (force = false) => {
-            // Scroll down if user is near the bottom OR if force is true (e.g., after history load)
-            const isScrolledToBottom = messageContainer.scrollHeight - messageContainer.clientHeight <= messageContainer.scrollTop + 150; // 150px tolerance
-            if (isScrolledToBottom || force) {
-                 // Use setTimeout to allow DOM to update before scrolling
+            // Check if user is scrolled near the bottom before auto-scrolling
+            const nearBottom = messageContainer.scrollHeight - messageContainer.clientHeight <= messageContainer.scrollTop + 150; // 150px threshold
+            if (force || nearBottom) {
+                 // Use setTimeout to ensure DOM is updated before scrolling calculation
                  setTimeout(() => {
                     messageContainer.scrollTop = messageContainer.scrollHeight;
-                    // console.log("Scrolled to bottom. Forced:", force); // Debug log
-                 }, 0);
+                 }, 50); // Small delay
             }
         };
 
         const showFlashMessage = (message, category = 'info') => {
             const flashElement = document.createElement('div');
-            const alertCategory = (category === 'error') ? 'danger' : category;
+            const alertCategory = (category === 'error') ? 'danger' : category; // Map 'error' to 'danger'
             flashElement.className = `alert alert-${alertCategory}`;
-            flashElement.textContent = message;
-            flashContainer.appendChild(flashElement);
+            flashElement.textContent = sanitize(message); // Sanitize flash message
+            chatFlashContainer.appendChild(flashElement);
+            // Add fade-out animation using class toggle after a delay
             setTimeout(() => {
-                flashElement.style.opacity = '0';
-                setTimeout(() => flashElement.remove(), 600);
-            }, 4000);
+                flashElement.classList.add('fade-out');
+                // Remove element after animation completes
+                setTimeout(() => flashElement.remove(), 600); // Corresponds to transition duration
+            }, 4000); // Start fading after 4 seconds
         };
 
         const setInputState = (enabled) => {
-            // console.log("Setting input state to:", enabled); // DEBUG LOG
+            // console.log("Setting input state:", enabled);
             messageInput.disabled = !enabled;
             sendButton.disabled = !enabled;
             messageInput.placeholder = enabled ? "Type your message..." : "Connecting...";
             if (enabled) { messageInput.focus(); }
+            // Initial auto-resize
+            if (enabled) {
+                 autoResizeTextarea();
+            }
         };
 
-        const showStatusMessage = (message) => {
-            messageContainer.innerHTML = ''; // Clear previous messages
+        const showStatusMessage = (message, isError = false) => {
+            messageContainer.innerHTML = ''; // Clear previous messages/status
             const statusElement = document.createElement('div');
-            statusElement.className = "system-message status-indicator"; // Use combined class
+            statusElement.className = `system-message status-indicator ${isError ? 'alert-danger' : ''}`;
             statusElement.innerHTML = `<span class="message-content">${sanitize(message)}</span>`;
             messageContainer.appendChild(statusElement);
         };
 
+         const autoResizeTextarea = () => {
+             messageInput.style.height = 'auto'; // Temporarily shrink
+             const scrollHeight = messageInput.scrollHeight;
+             const maxHeight = 100; // Match CSS max-height
+             messageInput.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+         };
+
         // --- SocketIO Event Handlers ---
         socketio.on("connect", () => {
-            console.log("Socket connected (connect event). SID:", socketio.id);
-            showStatusMessage("Connected. Loading messages...");
-            // History will be requested by server automatically on connect
+            console.log("Socket.IO: Connected successfully (SID:", socketio.id, ")");
+            // Don't immediately clear, wait for history/messages
+            setInputState(true); // Enable input now we're connected
+            // The server sends history and initial user count
         });
 
         socketio.on("disconnect", (reason) => {
-            console.warn("Socket disconnected:", reason);
-            showStatusMessage(`Disconnected: ${reason}. Attempting to reconnect...`);
+            console.warn("Socket.IO: Disconnected.", reason);
+            showStatusMessage(`Disconnected: ${reason}. Reconnecting...`, true);
             setInputState(false);
+            userCountDisplay.textContent = '?'; // Reset count display
         });
 
         socketio.on("connect_error", (err) => {
-            console.error("Connection Error:", err);
-            showStatusMessage(`Connection failed: ${err.message}. Please check your connection and refresh.`);
+            console.error("Socket.IO: Connection Error:", err.message);
+            showStatusMessage(`Connection failed: ${err.message}. Check connection and refresh.`, true);
             setInputState(false);
+             userCountDisplay.textContent = '?';
         });
 
         socketio.on("message_history", (data) => {
-            console.log("Received message history:", data); // DEBUG LOG
-            messageContainer.innerHTML = ''; // Clear loading/status message
-            if (data && data.messages && data.messages.length > 0) {
-                data.messages.forEach(msg => {
-                    // Determine if a historical message was system (though backend doesn't currently save them)
-                    const isSystem = (msg.name === "System");
-                    createMessageElement(msg.name, msg.message, msg.timestamp, msg.user_id, isSystem);
-                });
+            console.log("Socket.IO: Received message history. Count:", data?.messages?.length || 0);
+            messageContainer.innerHTML = ''; // Clear loading/status message FIRST
+            if (data && Array.isArray(data.messages) && data.messages.length > 0) {
+                data.messages.forEach(msg => createMessageElement(msg));
             } else {
-                // Show welcome message only if history is truly empty
-                createMessageElement("System", "Welcome! Start the conversation.", new Date().toISOString(), null, true);
+                // Show a welcome message only if history is empty
+                createMessageElement({
+                    name: "System", message: "Welcome to the chat! Be the first to send a message.",
+                    timestamp: new Date().toISOString(), userId: null, isSystem: true
+                });
             }
-            setInputState(true); // Enable input AFTER history is processed
-            scrollToBottom(true); // Force scroll to bottom after history load
+             // Enable input only after processing history (redundant if done on connect, but safe)
+             setInputState(true);
+             scrollToBottom(true); // Force scroll after history load
         });
 
         socketio.on("message", (data) => {
-            console.log("New message received (socketio.on('message')):", data); // DEBUG LOG
-
-            // Enable input if it was disabled (e.g., if history failed or was empty)
-            if (messageInput.disabled) {
-                console.log("Input was disabled. Enabling input now."); // DEBUG LOG
-                setInputState(true);
-                // Clear status message if present
-                const statusIndicator = messageContainer.querySelector('.status-indicator');
-                if (statusIndicator) { messageContainer.innerHTML = ''; }
-            }
-
-            // Process and display the message
-            if (data && data.message) {
-                const isSystem = (data.name === "System" || data.isSystem === true); // Check name or flag
-                createMessageElement(data.name, data.message, data.timestamp, data.user_id, isSystem);
-                // scrollToBottom() is called inside createMessageElement
-            } else {
-                console.warn("Received malformed message:", data);
-            }
+             console.log("Socket.IO: Received message:", data);
+             if (!messageInput.disabled) { // Only add if connected
+                if (data && data.message) {
+                    createMessageElement(data);
+                    scrollToBottom(); // Scroll if near bottom
+                } else { console.warn("Received invalid message format:", data); }
+             } else {
+                  console.warn("Received message while input disabled, ignoring display.");
+             }
         });
 
-        socketio.on("error", (data) => {
-            console.error("Server Error (socketio.on('error')):", data.message); // DEBUG LOG
+        socketio.on("update_user_count", (data) => {
+             console.log("Socket.IO: Update user count:", data);
+             if (data && typeof data.count === 'number') {
+                 userCountDisplay.textContent = data.count;
+             }
+        });
+
+        socketio.on("error", (data) => { // Handles custom errors from backend
+            console.error("Socket.IO: Server error received:", data.message);
             showFlashMessage(`Error: ${data.message}`, 'error');
         });
 
         // --- Sending Messages ---
         const sendMessage = () => {
-            // console.log("sendMessage function called");
             const message = messageInput.value.trim();
-            const isDisabled = messageInput.disabled;
-            // console.log(`Input value: "${message}"`, `Is disabled: ${isDisabled}`);
-
-            if (message && !isDisabled) {
-                // console.log("Message is valid and input is enabled. Emitting...");
-                try {
-                    // Backend expects message content under 'data' key
-                    socketio.emit("message", { data: message });
-                    // console.log("socketio.emit('message', ...) executed");
-                    messageInput.value = ""; // Clear input
-                    messageInput.focus(); // Refocus
-                    // Auto-resize textarea after sending
-                    messageInput.style.height = 'auto';
-                    messageInput.style.height = (messageInput.scrollHeight) + 'px';
-                } catch (e) {
-                    console.error("Error during socketio.emit or clearing input:", e);
-                    showFlashMessage("Error sending message. Check console.", "error");
-                }
-            } else {
-                // console.warn("sendMessage failed: Message empty or input disabled.", `Msg: "${message}", Disabled: ${isDisabled}`);
-                if (isDisabled) {
-                    showFlashMessage("Cannot send message while disconnected.", "warning");
-                }
+            if (message && !messageInput.disabled) {
+                console.log("Sending message:", message);
+                socketio.emit("message", { data: message }); // Backend expects {data: msg}
+                messageInput.value = ""; // Clear input after sending
+                autoResizeTextarea(); // Reset height
+                messageInput.focus(); // Refocus on input
+            } else if (messageInput.disabled) {
+                 console.warn("Attempted to send message while disconnected.");
+                 showFlashMessage("Cannot send message while disconnected.", "warning");
             }
         };
 
         // --- Event Listeners ---
-        sendButton.addEventListener("click", sendMessage);
+        messageForm.addEventListener("submit", (event) => {
+             event.preventDefault(); // Prevent default form submission
+             sendMessage();
+        });
 
-        messageInput.addEventListener("keypress", function (event) {
+        messageInput.addEventListener("keypress", (event) => {
+            // Send on Enter key (unless Shift is pressed)
             if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault(); // Prevent default newline
+                event.preventDefault(); // Prevent newline
                 sendMessage();
             }
         });
 
-        messageInput.addEventListener('input', function () {
-            this.style.height = 'auto'; // Reset height
-            // Limit height expansion
-            const maxHeight = 100; // Match CSS max-height
-            this.style.height = (Math.min(this.scrollHeight, maxHeight)) + 'px';
-        }, false);
+        messageInput.addEventListener('input', autoResizeTextarea);
+
 
         // --- Initial Setup ---
-        window.onload = () => {
-            console.log("Window loaded. Initializing chat..."); // DEBUG LOG
-            setInputState(false); // Start with input disabled
-            showStatusMessage("Connecting to chat..."); // Initial status
-            console.log(`Private chat room '${roomCode}' initializing for user:`, currentUser); // DEBUG LOG
-            // Calculate initial height for textarea
-            messageInput.style.height = 'auto';
-            messageInput.style.height = (messageInput.scrollHeight) + 'px';
-            // SocketIO connects automatically, triggering 'connect' event
-        };
+        window.addEventListener('load', () => {
+            console.log(`Private Chat Initializing: Room=${roomCode}, User=${currentUser}`);
+            // Set initial textarea size based on potential placeholder/content
+            autoResizeTextarea();
+            // Status message is set initially in HTML
+            // SocketIO connects automatically. 'connect' handler enables input.
+        });
 
     </script>
 

@@ -8,36 +8,45 @@
     <title>Register - Chat App</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
+    <!-- Google Fonts (Optional) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container auth-container">
         <div class="header">
-            <h1>Chat App</h1>
+            <h1>Create Chat App Account</h1>
         </div>
         <div class="main">
              <!-- Flash Messages -->
             {% include 'includes/_flash_messages.html' %}
 
             <form action="{{ url_for('register') }}" method="post" class="auth-form">
-                <h2>Create Account</h2>
+                <h2>Sign Up</h2>
+                <p>Create an account to join the chat rooms.</p>
+
                 <div class="form-group">
                      <label for="name" class="sr-only">Username:</label>
-                    <input id="name" name="name" type="text" placeholder="Username" required value="{{ request.form.name or '' }}">
+                    <input id="name" name="name" type="text" placeholder="Choose a Username" required value="{{ request.form.name or '' }}" autocomplete="username">
                 </div>
                 <div class="form-group">
                     <label for="email" class="sr-only">Email:</label>
-                    <input id="email" name="email" type="email" placeholder="Email Address" required value="{{ request.form.email or '' }}">
+                    <input id="email" name="email" type="email" placeholder="Enter your Email Address" required value="{{ request.form.email or '' }}" autocomplete="email">
                 </div>
                 <div class="form-group">
                     <label for="password" class="sr-only">Password:</label>
-                    <input id="password" name="password" type="password" placeholder="Password (min. 6 characters)" required minlength="6">
+                    <input id="password" name="password" type="password" placeholder="Create a Password (min. 6 characters)" required minlength="6" autocomplete="new-password">
+                    {# Note: confirm password field might be a good addition #}
                 </div>
                 <div class="form-group">
                     <button type="submit" class="btn btn-primary btn-block">Register</button>
                 </div>
-                <p class="or-separator"><span>or</span></p>
+
+                <p class="or-separator"><span>Already have an account?</span></p> {# Changed text #}
+
                  <div class="form-group">
-                    <a href="{{ url_for('home') }}" class="btn btn-secondary btn-block">Log In (Existing Account)</a>
+                    <a href="{{ url_for('home') }}" class="btn btn-secondary btn-block">Log In Instead</a>
                  </div>
             </form>
         </div>

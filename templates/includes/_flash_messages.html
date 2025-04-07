@@ -5,9 +5,9 @@
     {% if messages %}
         <div class="flash-messages">
             {% for category, message in messages %}
-                {# Map 'error' to 'danger' for Bootstrap alert styling if needed #}
-                {% set alert_category = 'danger' if category == 'error' else category %}
-                <div class="alert alert-{{ alert_category }}">{{ message }}</div>
+                {# Map common categories or default #}
+                {% set alert_category = 'danger' if category == 'error' else ('success' if category == 'success' else ('warning' if category == 'warning' else 'info')) %}
+                <div class="alert alert-{{ alert_category }}">{{ message | safe }}</div> {# Use 'safe' carefully if messages might contain HTML intentionally, otherwise use default Jinja escape #}
             {% endfor %}
         </div>
     {% endif %}

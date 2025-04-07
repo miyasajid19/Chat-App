@@ -5,19 +5,20 @@ import random
 import string
 import pymysql
 import datetime
+import pytz # Added for timezone awareness
 from dotenv import load_dotenv
 from flask import (
     Flask, render_template, request, redirect, session,
-    flash, url_for, g, jsonify, abort # Added abort
+    flash, url_for, g, jsonify, abort
 )
 from flask_socketio import (
-    SocketIO, join_room, leave_room, send, disconnect
+    SocketIO, join_room, leave_room, send, disconnect, emit # Added emit
 )
 from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
 import logging
 import sys # For sys.exit
-from functools import wraps # Added for decorator
+from functools import wraps
 
 # Load environment variables from .env file
 load_dotenv()
@@ -168,7 +169,7 @@ def initialize_database():
             user_id INT NULL COMMENT 'Foreign key to users table, NULL if user deleted or system message',
             user_name VARCHAR(255) NOT NULL COMMENT 'User name at the time of posting (denormalized for performance)',
             content TEXT NOT NULL COMMENT 'The chat message content',
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'Timestamp when the message was recorded (UTC recommended)',
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'Timestamp when the message was recorded (UTC)',
             INDEX room_time_idx (room_code, timestamp) COMMENT 'Index for efficient history fetching per room'
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Stores chat messages for all rooms';
         """)
@@ -205,15 +206,14 @@ def initialize_database():
 
 def ensure_admin_user():
     """Creates or updates the specified admin user."""
-    # !!! SECURITY WARNING: Hardcoding credentials here is highly insecure !!!
-    # !!! Use environment variables or a setup script for production !!!
+    # !!! SECURITY WARNING: Storing credentials like this is NOT recommended for production.
+    # Consider a setup script or environment variables only.
     admin_email = "smpk@smpk.com"
-    admin_pass = "407432" # The password requested
-    admin_name = "SMPK Admin" # A display name for the admin
+    admin_pass = "407432"
+    admin_name = "SMPK Admin"
 
     app.logger.info(f"Ensuring admin user '{admin_email}' exists and is configured...")
     try:
-        # Need app context to use get_db() safely outside request
         with app.app_context():
             conn = get_db()
             cursor = conn.cursor()
@@ -224,28 +224,30 @@ def ensure_admin_user():
                 hashed_pass = generate_password_hash(admin_pass)
 
                 if not admin_user:
-                    # Create the admin user
                     cursor.execute(
                         "INSERT INTO users (name, email, password, is_admin) VALUES (%s, %s, %s, TRUE)",
                         (admin_name, admin_email, hashed_pass)
                     )
                     app.logger.info(f"Created admin user '{admin_email}' with the specified password.")
                 else:
-                    # Update existing user to ensure password and admin status are correct
                     needs_update = False
+                    update_sql = "UPDATE users SET"
+                    update_params = []
                     if not check_password_hash(admin_user['password'], admin_pass):
-                        needs_update = True
-                        update_sql = "UPDATE users SET password = %s, is_admin = TRUE WHERE id = %s"
-                        update_params = (hashed_pass, admin_user['id'])
+                        update_sql += " password = %s,"
+                        update_params.append(hashed_pass)
                         app.logger.info(f"Updating password for admin user '{admin_email}'.")
-                    elif not admin_user['is_admin']:
                         needs_update = True
-                        update_sql = "UPDATE users SET is_admin = TRUE WHERE id = %s"
-                        update_params = (admin_user['id'],)
+                    if not admin_user['is_admin']:
+                        update_sql += " is_admin = TRUE,"
                         app.logger.info(f"Setting admin status for user '{admin_email}'.")
+                        needs_update = True
 
                     if needs_update:
-                        cursor.execute(update_sql, update_params)
+                        update_sql = update_sql.rstrip(',') # Remove trailing comma
+                        update_sql += " WHERE id = %s"
+                        update_params.append(admin_user['id'])
+                        cursor.execute(update_sql, tuple(update_params))
                     else:
                         app.logger.info(f"Admin user '{admin_email}' already exists and is correctly configured.")
 
@@ -253,58 +255,75 @@ def ensure_admin_user():
                 app.logger.error(f"Database error while ensuring admin user '{admin_email}': {e}", exc_info=True)
             finally:
                  if cursor: cursor.close()
-                 # close_db() will handle closing the connection via teardown_appcontext
+                 # Connection closed by teardown_appcontext
 
     except Exception as e:
-         # Catch errors related to app context or get_db
          app.logger.error(f"Failed to run ensure_admin_user within app context: {e}", exc_info=True)
 
 
 # Initialize DB and Admin User on startup
 try:
     initialize_database()
-    ensure_admin_user() # Create/Update the hardcoded admin user
-except RuntimeError as e:
+    ensure_admin_user()
+except (RuntimeError, ConnectionError) as e:
      print(f"Critical Error during startup: {e}", file=sys.stderr)
-     sys.exit(1) # Exit if DB initialization fails
-except ConnectionError as e:
-     print(f"Critical Error during startup - DB Connection Failed: {e}", file=sys.stderr)
      sys.exit(1)
 
 
 # In-memory room tracker: {'ROOMCODE': {'members': count, 'sids': {sid1, sid2,...}}}
 rooms = {}
+# Simple SID to username mapping (primarily for disconnect message)
+# Caution: Only holds users *currently* connected via SocketIO
+# Might be incomplete if session/socket relationship gets complex
+sid_to_user = {}
 
 # --- Utility Functions ---
 def generate_room_code(length=4):
     """Generates a unique uppercase letter room code."""
     while True:
         code = ''.join(random.choices(string.ascii_uppercase, k=length))
+        # Check memory AND if code could clash with database room name convention (like "PUBLIC")
         if code not in rooms and code != "PUBLIC":
-            return code
+            # Minimal check in DB (optional, as rooms activate on join anyway)
+            # This is just to reduce chance of collision if server restarts often
+            # You might omit the DB check here if performance is critical
+            # if not _room_exists_in_db(code): # Assuming a lightweight check function
+                return code
+    # Note: If _room_exists_in_db is added, handle its exceptions
 
 def is_valid_room(room_code):
-    """Checks if a room exists either in memory or has history in DB."""
+    """Checks if a room exists either in memory OR has history in DB."""
+    if not room_code or not isinstance(room_code, str) or len(room_code) > 10 : # Basic validation
+        app.logger.warning(f"Invalid room_code format checked: '{room_code}'")
+        return False
+
     if room_code in rooms:
         return True
+
+    # If not in memory, check DB history to see if it *could* be reactivated
     try:
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute("SELECT 1 FROM messages WHERE room_code = %s LIMIT 1", (room_code,))
         exists_in_db = cursor.fetchone() is not None
         cursor.close()
+
         if exists_in_db:
-            if room_code not in rooms:
-                rooms[room_code] = {"members": 0, "sids": set()}
-                app.logger.info(f"Re-activated room tracker for '{room_code}' based on DB history check.")
-            return True
+            # IMPORTANT: Only initialize room in memory if someone actually *joins* it.
+            # This prevents filling memory with all historical rooms on simple checks.
+            # We'll initialize the dict in `handle_connect` if needed.
+            app.logger.debug(f"Room '{room_code}' exists in DB history but is not active in memory.")
+            return True # Indicates it's a valid potential room code
     except pymysql.MySQLError as e:
          app.logger.error(f"DB error checking room existence for {room_code}: {e}")
-         return False
+         return False # Treat DB error as room not valid for now
     except ConnectionError as e:
          app.logger.error(f"DB Connection error checking room existence for {room_code}: {e}")
          return False
+
+    app.logger.debug(f"Room code '{room_code}' not found in memory or DB history.")
     return False
+
 
 # --- Decorators ---
 def login_required(f):
@@ -327,7 +346,7 @@ def admin_required(f):
         if not session.get('is_admin'):
             flash("You do not have permission to access the admin area.", "danger")
             app.logger.warning(f"Unauthorized admin access attempt by user: {session.get('name')} (ID: {session.get('user_id')}) to {request.url}")
-            return redirect(url_for('dashboard')) # Redirect non-admins away
+            return redirect(url_for('dashboard'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -377,7 +396,6 @@ def register():
                 flash("This username is already taken. Please choose another.", "error")
                 return render_template('register.html', name=name, email=email), 409
 
-            # Insert new user (is_admin defaults to FALSE in DB schema)
             cursor.execute("INSERT INTO users (name, email, password) VALUES (%s, %s, %s)",
                            (name, email, hashed_password))
 
@@ -385,8 +403,8 @@ def register():
             session['user_id'] = user_id
             session['name'] = name
             session['email'] = email
-            session['is_admin'] = False # New users are not admins by default
-            session.permanent = True
+            session['is_admin'] = False # New users are not admins
+            session.permanent = True # Remember session across browser closes
             app.logger.info(f"User '{name}' (ID: {user_id}) registered successfully and logged in.")
 
             flash(f"Account created successfully! Welcome, {name}!", "success")
@@ -413,6 +431,7 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password')
+        remember = request.form.get('remember') # Check for remember me
 
         if not email or not password:
             flash("Email and password are required.", "error")
@@ -421,25 +440,34 @@ def login():
         conn = get_db()
         cursor = conn.cursor()
         try:
-            # Fetch is_admin status
             cursor.execute("SELECT id, name, email, password, is_admin FROM users WHERE email = %s", (email,))
             user = cursor.fetchone()
 
             if user and check_password_hash(user['password'], password):
-                session.permanent = True
+                # Set session permanence based on checkbox
+                session.permanent = (remember == 'on')
                 session['user_id'] = user['id']
                 session['name'] = user['name']
                 session['email'] = user['email']
-                session['is_admin'] = user['is_admin'] # Store admin status
-                app.logger.info(f"User '{user['name']}' (ID: {user['id']}, Admin: {user['is_admin']}) logged in successfully.")
+                session['is_admin'] = user['is_admin']
+                app.logger.info(f"User '{user['name']}' (ID: {user['id']}, Admin: {user['is_admin']}) logged in. Permanent session: {session.permanent}")
 
                 next_url = request.args.get('next')
-                if next_url and next_url.startswith('/') and not next_url.startswith('//') and ':' not in next_url:
-                    app.logger.debug(f"Redirecting logged-in user to requested 'next' URL: {next_url}")
-                    return redirect(next_url)
-                else:
-                    if next_url: app.logger.warning(f"Ignoring potentially unsafe 'next' URL: {next_url}")
-                    return redirect(url_for('dashboard'))
+                # Improved URL validation (relative path or same host)
+                if next_url and next_url.startswith('/') and not next_url.startswith('//'):
+                     try:
+                         # Ensure the next_url doesn't point to external domains via clever path manipulation
+                         # This check isn't foolproof but helps against basic open redirect
+                         if url_for('home', _external=False) in url_for(next_url[1:], _external=False):
+                              app.logger.debug(f"Redirecting logged-in user to safe 'next' URL: {next_url}")
+                              return redirect(next_url)
+                         else:
+                              app.logger.warning(f"Ignoring potentially unsafe 'next' URL structure: {next_url}")
+                     except Exception: # If url_for fails for next_url, it's likely invalid
+                         app.logger.warning(f"Ignoring invalid 'next' URL: {next_url}")
+
+                return redirect(url_for('dashboard')) # Default redirect
+
             else:
                 flash("Invalid email or password. Please try again.", "error")
                 return render_template('index.html', email=email), 401
@@ -460,28 +488,35 @@ def login():
 @app.route('/logout')
 def logout():
     user_name = session.get('name', 'User')
+    # Store details before clearing session, for logging/flash message
+    user_id = session.get('user_id')
+
     # Clear user-specific session data
     session.pop('user_id', None)
     session.pop('name', None)
     session.pop('email', None)
     session.pop('room', None)
-    session.pop('is_admin', None) # Clear admin status
+    session.pop('is_admin', None)
+    # Clear potentially sensitive password reset state
     session.pop('reset_otp', None)
     session.pop('reset_email', None)
     session.pop('reset_otp_expires', None)
 
+    # You might want session.clear() to remove everything, but Flask keeps some internals.
+    # The above should be sufficient.
+
     flash(f"You have been successfully logged out. Goodbye, {user_name}!", "info")
-    app.logger.info(f"User '{user_name}' logged out.")
+    app.logger.info(f"User '{user_name}' (ID: {user_id}) logged out.")
     return redirect(url_for('home'))
 
 @app.route('/dashboard')
-@login_required # Use the decorator
+@login_required
 def dashboard():
+    # Clean up potential leftover 'room' from previous session state
     if 'room' in session:
-        app.logger.debug(f"Clearing room '{session.get('room')}' from session on dashboard access for user '{session.get('name')}'")
+        app.logger.debug(f"Clearing lingering room '{session.get('room')}' from session on dashboard access for user '{session.get('name')}'")
         session.pop('room', None)
 
-    # Pass admin status to template to conditionally show admin link
     is_admin = session.get('is_admin', False)
     return render_template('dashboard.html', username=session.get('name'), is_admin=is_admin)
 
@@ -494,6 +529,7 @@ def forget_password():
             flash("Email address is required.", "error")
             return render_template('forgetPassword.html'), 400
 
+        # Check mail config BEFORE DB lookup
         if not all([app.config.get('MAIL_USERNAME'), app.config.get('MAIL_PASSWORD'), app.config.get('MAIL_DEFAULT_SENDER')]):
              flash("Password reset emails are currently disabled due to server configuration. Please contact support.", "error")
              app.logger.error("Password reset requested but mail is not configured.")
@@ -502,33 +538,49 @@ def forget_password():
         conn = get_db()
         cursor = conn.cursor()
         try:
-            cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
+            cursor.execute("SELECT id, name FROM users WHERE email = %s", (email,)) # Fetch name too
             user = cursor.fetchone()
             if user:
                 otp = ''.join(random.choices(string.digits, k=6))
-                expiry_time = datetime.datetime.utcnow() + datetime.timedelta(minutes=10)
+                # Use UTC time for expiry calculation
+                expiry_time = datetime.datetime.now(pytz.utc) + datetime.timedelta(minutes=10)
 
+                # Store OTP hash, associated email, and expiry timestamp (ISO format for session serialization)
                 session['reset_otp'] = generate_password_hash(otp)
                 session['reset_email'] = email
                 session['reset_otp_expires'] = expiry_time.isoformat()
-                session.permanent = True
+                session.permanent = False # OTP session shouldn't persist long-term
 
                 try:
-                    message_body = f"Your OTP to reset your ChatApp password is: {otp}\n\nThis OTP is valid for 10 minutes."
-                    message = Message(subject="Your ChatApp Password Reset OTP", recipients=[email], body=message_body)
+                    # Send the email
+                    user_name = user['name']
+                    message_body = (f"Hi {user_name},\n\n"
+                                    f"Your OTP to reset your ChatApp password is: {otp}\n\n"
+                                    f"This OTP is valid for 10 minutes.\n\n"
+                                    f"If you didn't request this, please ignore this email.")
+                    message = Message(subject="Your ChatApp Password Reset OTP",
+                                      recipients=[email],
+                                      body=message_body)
                     mail.send(message)
-                    app.logger.info(f"Password reset OTP sent to {email}")
-                    flash("An OTP has been sent to your email address. Please check your inbox (and spam folder). It's valid for 10 minutes.", "info")
+
+                    app.logger.info(f"Password reset OTP sent to {email} for user {user_name}")
+                    flash("An OTP has been sent to your email address (if it's registered). Please check your inbox (and spam folder). It's valid for 10 minutes.", "info")
+                    # Redirect to the reset page where OTP is entered
                     return redirect(url_for('reset_password'))
+
                 except Exception as e:
                     app.logger.error(f"Failed to send OTP email to {email}: {e}", exc_info=True)
                     flash("Could not send the OTP email due to a server error. Please try again later or contact support.", "error")
+                    # Clear failed OTP state from session
                     session.pop('reset_otp', None); session.pop('reset_email', None); session.pop('reset_otp_expires', None)
                     return render_template('forgetPassword.html', email=email), 500
             else:
-                app.logger.warning(f"Password reset requested for non-existent or incorrect email: {email}")
+                # SECURITY: Do NOT reveal if the email exists or not. Use the same message.
+                app.logger.warning(f"Password reset requested for non-existent or incorrect email: {email}. Sent generic success message.")
                 flash("If an account with that email exists, an OTP has been sent. Please check your inbox (and spam folder).", "info")
-                return redirect(url_for('reset_password'))
+                # Still redirect to reset page to avoid confirming email existence via URL flow
+                return redirect(url_for('reset_password')) # Redirect even if email doesn't exist
+
         except pymysql.MySQLError as e:
             app.logger.error(f"Database error during password forget request for {email}: {e}")
             flash("A database error occurred. Please try again.", "error")
@@ -548,13 +600,18 @@ def reset_password():
     otp_hash = session.get('reset_otp')
     otp_expires_iso = session.get('reset_otp_expires')
 
+    # Check if the essential session variables exist
     if not all([reset_email, otp_hash, otp_expires_iso]):
         flash("Invalid password reset request or session expired. Please request a new OTP.", "warning")
         return redirect(url_for('forget_password'))
 
     try:
-        otp_expires = datetime.datetime.fromisoformat(otp_expires_iso)
-        if datetime.datetime.utcnow() > otp_expires:
+        # Parse expiry time, make it timezone-aware UTC
+        otp_expires = datetime.datetime.fromisoformat(otp_expires_iso).replace(tzinfo=pytz.utc)
+        # Get current time also as timezone-aware UTC
+        now_utc = datetime.datetime.now(pytz.utc)
+
+        if now_utc > otp_expires:
             session.pop('reset_otp', None); session.pop('reset_email', None); session.pop('reset_otp_expires', None)
             flash("Your OTP has expired. Please request a new one.", "error")
             return redirect(url_for('forget_password'))
@@ -570,32 +627,39 @@ def reset_password():
         confirm_password = request.form.get('confirm_password')
 
         errors = []
-        if not otp_entered: errors.append("OTP is required.")
-        if not new_password: errors.append("New password is required.")
-        if not confirm_password: errors.append("Confirm password is required.")
-        if new_password != confirm_password: errors.append("The new passwords do not match.")
-        elif len(new_password) < 6: errors.append("Password must be at least 6 characters long.")
+        # Check OTP first
         if not otp_entered or not check_password_hash(otp_hash, otp_entered):
              errors.append("The OTP entered is invalid or has expired.")
+        # Check passwords only if OTP is likely valid (avoid revealing too much info)
+        else:
+            if not new_password: errors.append("New password is required.")
+            elif len(new_password) < 6: errors.append("Password must be at least 6 characters long.")
+            if not confirm_password: errors.append("Confirm password is required.")
+            elif new_password != confirm_password: errors.append("The new passwords do not match.")
 
         if errors:
             for error in errors: flash(error, "error")
+            # Keep user on resetPassword page, don't clear session yet
             return render_template('resetPassword.html'), 400
 
+        # If all checks pass, hash new password and update DB
         new_hashed_password = generate_password_hash(new_password)
         conn = get_db()
         cursor = conn.cursor()
         try:
+            # Ensure update only happens for the correct email linked to the OTP
             rows_affected = cursor.execute("UPDATE users SET password = %s WHERE email = %s", (new_hashed_password, reset_email))
 
             if rows_affected == 1:
                 app.logger.info(f"Password successfully reset for email: {reset_email}")
+                # IMPORTANT: Clear OTP state AFTER successful reset
                 session.pop('reset_otp', None); session.pop('reset_email', None); session.pop('reset_otp_expires', None)
                 flash("Your password has been reset successfully. Please log in with your new password.", "success")
-                return redirect(url_for('login'))
+                return redirect(url_for('login')) # Redirect to login page
             else:
-                 app.logger.error(f"Password reset failed for {reset_email}: user not found in DB during update, despite valid OTP session.")
-                 flash("An unexpected error occurred while updating your password. Please try again.", "error")
+                 # This case implies the email existed when OTP was sent but was deleted/changed before reset.
+                 app.logger.error(f"Password reset failed for {reset_email}: User not found or DB issue during update, despite valid OTP session state.")
+                 flash("An unexpected error occurred while updating your password. User may no longer exist. Please try again or contact support.", "error")
                  return render_template('resetPassword.html'), 500
 
         except pymysql.MySQLError as e:
@@ -609,6 +673,7 @@ def reset_password():
         finally:
             if cursor: cursor.close()
 
+    # For GET request, just render the page
     return render_template('resetPassword.html')
 
 
@@ -625,41 +690,46 @@ def join_room_route():
     target_room_code = None
 
     if join_room_action:
+        # Validate input code
         if not room_code_input:
             flash("Please enter a room code to join.", "error")
             return redirect(url_for('dashboard'))
         if len(room_code_input) != 4 or not room_code_input.isalpha():
-            flash("Invalid room code format (must be exactly 4 letters).", "error")
+            flash("Invalid room code format (must be exactly 4 uppercase letters).", "error")
             return redirect(url_for('dashboard'))
         if room_code_input == "PUBLIC":
              flash("Cannot join 'PUBLIC' room this way. Use the Public Chat link.", "warning")
              return redirect(url_for('dashboard'))
 
-        # Use is_valid_room which checks DB too
+        # Check if the room exists (in memory or has history in DB)
         if not is_valid_room(room_code_input):
-             flash(f"Room code '{room_code_input}' does not exist or is invalid.", "error")
+             flash(f"Room code '{room_code_input}' does not exist or has no message history.", "error")
              return redirect(url_for('dashboard'))
 
         target_room_code = room_code_input
+        app.logger.info(f"User '{name}' (ID: {user_id}) joining existing private room '{target_room_code}'.")
 
     elif create_room_action:
         new_code = generate_room_code()
+        # Initialize room tracker immediately on creation
         rooms[new_code] = {"members": 0, "sids": set()}
         target_room_code = new_code
         app.logger.info(f"User '{name}' (ID: {user_id}) created new private room '{target_room_code}'.")
-        # Save a "Room Created" system message? Maybe not needed.
-        # save_message(target_room_code, None, "System", f"Room '{target_room_code}' created by {name}.")
+        # Optional: Save a "Room Created" system message to DB?
+        # save_message(target_room_code, None, "System", f"Room created by {name}.") # Decide if needed
+
     else:
         flash("Invalid action specified.", "error")
         return redirect(url_for('dashboard'))
 
+    # Store target room in session and redirect to the chat view
     session['room'] = target_room_code
-    app.logger.info(f"User '{name}' (ID: {user_id}) attempting to enter room '{target_room_code}'.")
+    app.logger.info(f"User '{name}' (ID: {user_id}) being redirected to room '{target_room_code}'.")
 
     if target_room_code == "PUBLIC":
-         return redirect(url_for('public_chat'))
+         return redirect(url_for('public_chat')) # Should not happen via this form, but handle defensively
     else:
-         return redirect(url_for('room'))
+         return redirect(url_for('room')) # Redirect to private room view
 
 @app.route('/room') # Route for PRIVATE chat rooms
 @login_required
@@ -671,18 +741,21 @@ def room():
         flash("No active room selected or user session invalid. Please join or create one from the dashboard.", "warning")
         return redirect(url_for('dashboard'))
 
+    # Ensure it's not the PUBLIC room accessed via the wrong URL
     if room_code == "PUBLIC":
-         flash("Please use the dedicated Public Chat link from the dashboard.", "warning")
-         session.pop('room', None)
+         flash("Please use the dedicated Public Chat link for the PUBLIC room.", "warning")
+         session.pop('room', None) # Clear invalid room state
          return redirect(url_for('dashboard'))
 
-    # Use is_valid_room to check if room exists in memory or DB
+    # Double check the private room is valid (exists in memory OR DB history)
+    # This check is slightly redundant if joined via form, but protects direct URL access
     if not is_valid_room(room_code):
          flash(f"The room '{room_code}' is no longer active or valid.", "error")
-         session.pop('room', None)
+         session.pop('room', None) # Clear invalid room state
          return redirect(url_for('dashboard'))
 
     app.logger.debug(f"Rendering private chat room '{room_code}' for user '{user_name}'.")
+    # Pass room code and username for the template to use
     return render_template('chatroom.html', room_code=room_code, username=user_name)
 
 @app.route('/public_chat') # Route specifically for the PUBLIC chat room
@@ -693,6 +766,7 @@ def public_chat():
          flash("User information missing. Please log in again.", "error")
          return redirect(url_for('login'))
 
+    # Set the room in session
     session['room'] = "PUBLIC"
 
     # Ensure PUBLIC room tracker exists in memory
@@ -701,16 +775,34 @@ def public_chat():
         app.logger.info("Initialized PUBLIC room tracker in memory.")
 
     app.logger.info(f"User '{user_name}' entering public chat (room 'PUBLIC').")
-    return render_template('public_chat.html', username=user_name) # Pass username
+    # Pass username for the template
+    return render_template('public_chat.html', username=user_name)
 
 
 # --- Admin Routes ---
 @app.route('/admin')
-@admin_required # Use the decorator
+@admin_required
 def admin_dashboard():
     """Renders the main admin dashboard page."""
-    # Could add stats here later (e.g., user count, active rooms)
-    return render_template('admin/admin_dashboard.html', username=session.get('name'))
+    user_count = 0
+    active_room_count = len([r for r, data in rooms.items() if data['members'] > 0]) # Count rooms with active members
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) as count FROM users")
+        result = cursor.fetchone()
+        if result:
+            user_count = result['count']
+        cursor.close()
+    except Exception as e:
+        app.logger.error(f"Admin dashboard: Error getting user count: {e}")
+        flash("Could not retrieve user count.", "warning")
+
+    return render_template('admin/admin_dashboard.html',
+                           username=session.get('name'),
+                           user_count=user_count,
+                           active_room_count=active_room_count)
 
 @app.route('/admin/users')
 @admin_required
@@ -720,9 +812,13 @@ def admin_users():
     try:
         conn = get_db()
         cursor = conn.cursor()
-        # Fetch all users, excluding the current admin viewing the page
-        current_user_id = session.get('user_id')
-        cursor.execute("SELECT id, name, email, created_at FROM users WHERE id != %s ORDER BY created_at DESC", (current_user_id,))
+        # Fetch all users, INCLUDING the current admin, but note if they are admins
+        # Order by registration date, newest first
+        cursor.execute("""
+            SELECT id, name, email, created_at, is_admin
+            FROM users
+            ORDER BY created_at DESC
+        """)
         users = cursor.fetchall()
         cursor.close()
     except pymysql.MySQLError as e:
@@ -732,7 +828,11 @@ def admin_users():
          app.logger.error(f"Admin area: DB Connection error fetching users: {e}")
          flash("Could not connect to the database to retrieve users.", "error")
 
-    return render_template('admin/admin_users.html', users=users, username=session.get('name'))
+    current_user_id = session.get('user_id')
+    return render_template('admin/admin_users.html',
+                           users=users,
+                           current_user_id=current_user_id, # Pass current admin's ID
+                           username=session.get('name'))
 
 @app.route('/admin/user/<int:user_id>/delete', methods=['POST'])
 @admin_required
@@ -740,13 +840,13 @@ def admin_delete_user(user_id):
     """Deletes a user account."""
     current_user_id = session.get('user_id')
     if user_id == current_user_id:
-        flash("Admins cannot delete their own account.", "error")
+        flash("Admins cannot delete their own account via this interface.", "error")
         return redirect(url_for('admin_users'))
 
     try:
         conn = get_db()
         cursor = conn.cursor()
-        # Check if user exists and if they are an admin before deleting
+        # Need to know name for logging/flash and if they are admin
         cursor.execute("SELECT name, is_admin FROM users WHERE id = %s", (user_id,))
         user_to_delete = cursor.fetchone()
 
@@ -754,24 +854,24 @@ def admin_delete_user(user_id):
             flash("User not found.", "error")
             return redirect(url_for('admin_users'))
 
-        # Prevent deleting other admins (policy decision)
+        # Prevent deleting other admins (Policy Decision - Keep this?)
         if user_to_delete['is_admin']:
-             flash("Cannot delete another administrator account.", "error")
+             flash("Deleting other administrator accounts is disabled.", "error")
              app.logger.warning(f"Admin {session.get('name')} ({current_user_id}) attempted to delete admin {user_to_delete['name']} ({user_id}). Operation blocked.")
              return redirect(url_for('admin_users'))
 
         # Proceed with deletion
-        # Note: Messages from this user will have user_id set to NULL due to FK constraint
+        # The ON DELETE SET NULL constraint on messages table will handle foreign key.
         rows_affected = cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
-        cursor.close()
+        cursor.close() # Close cursor before redirect
 
         if rows_affected > 0:
-            flash(f"User '{user_to_delete['name']}' (ID: {user_id}) has been deleted successfully.", "success")
+            flash(f"User '{user_to_delete['name']}' (ID: {user_id}) has been deleted successfully. Their past messages remain associated with their username.", "success")
             app.logger.info(f"Admin {session.get('name')} ({current_user_id}) deleted user {user_to_delete['name']} ({user_id}).")
         else:
-            # Should not happen if user was found, but handle defensively
+            # This should theoretically not happen if user was found before
             flash(f"Could not delete user (ID: {user_id}). They may have already been deleted.", "warning")
-            app.logger.warning(f"Admin {session.get('name')} ({current_user_id}) attempted delete for user ID {user_id}, but 0 rows were affected.")
+            app.logger.warning(f"Admin {session.get('name')} ({current_user_id}) attempted delete for user ID {user_id}, but 0 rows were affected after finding the user.")
 
     except pymysql.MySQLError as e:
         app.logger.error(f"Admin area: Error deleting user ID {user_id}: {e}")
@@ -779,27 +879,27 @@ def admin_delete_user(user_id):
     except ConnectionError as e:
          app.logger.error(f"Admin area: DB Connection error deleting user ID {user_id}: {e}")
          flash("Could not connect to the database to delete user.", "error")
-
+    # No matter what, redirect back
     return redirect(url_for('admin_users'))
 
-# Potential future admin actions (Update User)
+# Potential future admin action stub
 # @app.route('/admin/user/<int:user_id>/edit', methods=['GET', 'POST'])
 # @admin_required
 # def admin_edit_user(user_id):
-#     # Fetch user data for GET
-#     # Handle password update (optional), username change, is_admin toggle
+#     # Fetch user details for GET
+#     # Handle form submission for POST (update name, email, potentially is_admin toggle - BE CAREFUL)
 #     pass
 
 
 # --- Database Helper Functions for Chat ---
-def get_message_history(room_code, limit=50):
+def get_message_history(room_code, limit=75): # Increased limit slightly
     """Fetches the last 'limit' messages for a given room_code from the database, ordered oldest to newest."""
     app.logger.debug(f"Fetching history for room_code: '{room_code}', Limit: {limit}")
     messages = []
     try:
         conn = get_db()
         cursor = conn.cursor()
-        # Fetch in reverse chronological order (latest first) then reverse in Python
+        # Fetch latest messages first, then reverse
         query = """
             SELECT user_id, user_name, content, timestamp
             FROM messages
@@ -808,35 +908,35 @@ def get_message_history(room_code, limit=50):
             LIMIT %s
         """
         cursor.execute(query, (room_code, limit))
-        db_messages = list(cursor.fetchall())
-        db_messages.reverse() # Order from oldest to newest for display
-        app.logger.debug(f"Fetched {len(db_messages)} messages from DB for room '{room_code}'")
+        db_messages = list(cursor.fetchall()) # Fetch all into a list
+        db_messages.reverse() # Order oldest to newest for display
+        app.logger.debug(f"Fetched {len(db_messages)} messages from DB for room '{room_code}'.")
 
-        # Format for sending to client (ensure UTC ISO format)
+        # Format for client, ensuring UTC ISO timestamps
         for msg in db_messages:
-             ts_aware = msg['timestamp']
-             # Ensure the timestamp is timezone-aware UTC
-             if ts_aware.tzinfo is None:
-                 ts_aware = ts_aware.replace(tzinfo=datetime.timezone.utc)
-             else:
-                 ts_aware = ts_aware.astimezone(datetime.timezone.utc)
+             # Assume DB timestamp is naive but represents UTC
+             ts_naive = msg['timestamp']
+             ts_aware_utc = ts_naive.replace(tzinfo=pytz.utc)
 
              messages.append({
-                 "name": msg['user_name'],
+                 "name": msg['user_name'], # Stored username at time of posting
                  "message": msg['content'],
-                 "timestamp": ts_aware.isoformat(), # Use ISO format for JS
-                 "user_id": msg['user_id']
-                 # Note: System messages are not currently saved to DB
+                 "timestamp": ts_aware_utc.isoformat(), # Send ISO string to client
+                 "user_id": msg['user_id'],
+                 "isSystem": False # Currently, only user messages are stored
              })
-        app.logger.debug(f"Formatted {len(messages)} history messages for room '{room_code}'")
+        app.logger.debug(f"Formatted {len(messages)} history messages for room '{room_code}' for client.")
 
     except pymysql.MySQLError as e:
-        app.logger.error(f"Error fetching/formatting history for room '{room_code}': {e}")
+        app.logger.error(f"DB Error fetching history for room '{room_code}': {e}")
     except ConnectionError as e:
-         app.logger.error(f"DB Connection error fetching history for room '{room_code}': {e}")
+         app.logger.error(f"DB Connection Error fetching history for room '{room_code}': {e}")
     finally:
-        if 'cursor' in locals() and cursor: cursor.close()
-    return messages # Return formatted list
+        # Ensure cursor is closed even if DB connection stays open for the request
+        if 'cursor' in locals() and cursor:
+             try: cursor.close()
+             except Exception as cur_e: app.logger.error(f"Error closing history cursor: {cur_e}")
+    return messages
 
 def save_message(room_code, user_id, user_name, content):
     """Saves a chat message to the database."""
@@ -845,226 +945,302 @@ def save_message(room_code, user_id, user_name, content):
     try:
         conn = get_db()
         cursor = conn.cursor()
-        # Use UTC time for timestamps
-        utc_now = datetime.datetime.utcnow()
+        # Use UTC timestamp directly
+        utc_now = datetime.datetime.now(pytz.utc)
         query = """
             INSERT INTO messages (room_code, user_id, user_name, content, timestamp)
             VALUES (%s, %s, %s, %s, %s)
         """
         cursor.execute(query, (room_code, user_id, user_name, content, utc_now))
+        # No explicit commit needed due to autocommit=True setting in DB_CONFIG
         success = True
-        app.logger.debug(f"Message saved to DB for room '{room_code}'")
+        app.logger.debug(f"Message saved to DB for room '{room_code}'.")
     except pymysql.MySQLError as e:
-        app.logger.error(f"Error saving message for room '{room_code}' by user {user_name}: {e}")
+        app.logger.error(f"DB Error saving message for room '{room_code}' by user {user_name}: {e}")
     except ConnectionError as e:
-         app.logger.error(f"DB Connection error saving message for room '{room_code}': {e}")
+         app.logger.error(f"DB Connection Error saving message for room '{room_code}': {e}")
     finally:
-        if 'cursor' in locals() and cursor: cursor.close()
+        if 'cursor' in locals() and cursor:
+             try: cursor.close()
+             except Exception as cur_e: app.logger.error(f"Error closing save message cursor: {cur_e}")
     return success
 
 
 # --- SocketIO Event Handlers ---
 
+def emit_user_count(room_code):
+    """Helper to emit the current user count for a room."""
+    if room_code in rooms:
+        count = rooms[room_code]['members']
+        app.logger.debug(f"Emitting user count for room '{room_code}': {count}")
+        socketio.emit('update_user_count', {'count': count}, to=room_code)
+    else:
+         app.logger.warning(f"Tried to emit user count for non-existent room tracker: '{room_code}'")
+
+
 @socketio.on('connect')
 def handle_connect():
-    """Handles new client connections and sends message history."""
+    """Handles new client connections."""
     sid = request.sid
+    # Extract user info from session
     room_code = session.get('room')
     user_name = session.get('name')
     user_id = session.get('user_id')
 
-    app.logger.debug(f"[Connect] SID={sid} attempting connection. Session: User='{user_name}'(ID:{user_id}), Room='{room_code}'")
+    app.logger.debug(f"[Connect] SID={sid}. Session: User='{user_name}'(ID:{user_id}), Room='{room_code}'")
 
+    # Validation: Ensure user and room details are present in the session
     if not all([room_code, user_name, user_id]):
-        app.logger.warning(f"Socket connection REJECTED for SID {sid}: Missing room/user/id in session.")
-        socketio.emit('error', {'message': 'Invalid session. Please refresh or log in again.'}, room=sid)
-        disconnect(sid)
-        return False
+        app.logger.warning(f"Socket connection REJECTED for SID {sid}: Missing required session data (room, name, or id).")
+        socketio.emit('error', {'message': 'Invalid session data. Please refresh or log in again.'}, room=sid)
+        disconnect(sid) # Explicitly disconnect the client
+        return False # Indicate connection failure
 
-    # Ensure room tracker exists / is valid (using is_valid_room checks DB & initializes)
+    # Check if the target room is valid (exists in memory OR DB history)
+    # Use is_valid_room, but initialize tracker if needed *here*
     if room_code not in rooms:
-        if not is_valid_room(room_code):
-             app.logger.error(f"Room '{room_code}' invalid during connect for SID {sid}. Disconnecting.")
-             socketio.emit('error', {'message': f'Room {room_code} is invalid or no longer exists.'}, room=sid)
-             disconnect(sid); return False
-        # else: tracker initialized by is_valid_room call above
+        if is_valid_room(room_code): # Checks DB history too
+             # Room exists in DB but not memory, initialize tracker now
+             rooms[room_code] = {"members": 0, "sids": set()}
+             app.logger.info(f"Initialized in-memory tracker for room '{room_code}' based on DB history check during connect.")
+        else:
+             app.logger.error(f"Connection REJECTED for SID {sid}: Room '{room_code}' is invalid (not in memory or DB history).")
+             socketio.emit('error', {'message': f'Room "{room_code}" is invalid or no longer exists.'}, room=sid)
+             disconnect(sid)
+             return False
 
+    # --- Proceed with joining ---
     join_room(room_code)
     rooms[room_code]["members"] += 1
     rooms[room_code]["sids"].add(sid)
+    sid_to_user[sid] = user_name # Store SID -> username mapping
+
     app.logger.info(f"User '{user_name}' (SID: {sid}) successfully CONNECTED to room '{room_code}'. Active members: {rooms[room_code]['members']}.")
 
-    # Send message history
+    # Emit the updated user count to everyone in the room
+    emit_user_count(room_code)
+
+    # Send message history ONLY to the connecting user
     try:
-        history_messages = get_message_history(room_code) # Already formatted correctly
-        app.logger.debug(f"Sending {len(history_messages)} history messages to {user_name} (SID: {sid}) in room '{room_code}'")
-        socketio.emit('message_history', {'messages': history_messages}, room=sid)
+        history_messages = get_message_history(room_code)
+        if history_messages: # Only emit if there's history
+             app.logger.debug(f"Sending {len(history_messages)} history messages to {user_name} (SID: {sid}) in room '{room_code}'")
+             socketio.emit('message_history', {'messages': history_messages}, room=sid)
+        else:
+            app.logger.debug(f"No message history found for room '{room_code}'. Sending welcome.")
+            # Optionally send a specific "no history" or "welcome" message to the client if desired
+            # socketio.emit('system_message', {'message': 'Welcome! No previous messages.'}, room=sid)
     except Exception as e:
         app.logger.error(f"Error retrieving/sending history for room '{room_code}' to {user_name} (SID: {sid}): {e}", exc_info=True)
         socketio.emit('error', {'message': 'Error loading message history.'}, room=sid)
 
-    # Notify others about the join (exclude self)
+    # Notify others about the join (exclude the user who just joined)
     join_message_content = f"{user_name} has joined the room."
-    join_ts = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
+    join_ts = datetime.datetime.now(pytz.utc).isoformat()
     join_message = {
-        "name": "System", "message": join_message_content,
-        "timestamp": join_ts, "user_id": None, "isSystem": True
+        "name": "System",
+        "message": join_message_content,
+        "timestamp": join_ts,
+        "user_id": None, # System messages have no user ID
+        "isSystem": True
         }
-    socketio.emit('message', join_message, to=room_code, skip_sid=sid)
-    app.logger.debug(f"Sent join notification for {user_name} to room '{room_code}' (skipped SID {sid})")
-    return True
+    socketio.emit('message', join_message, to=room_code, skip_sid=sid) # skip_sid ensures the joiner doesn't get their own join message
+    app.logger.debug(f"Sent join notification for '{user_name}' to room '{room_code}' (skipped SID {sid})")
+
+    return True # Indicate successful connection
 
 
 @socketio.on('disconnect')
 def handle_disconnect():
     """Handles client disconnections."""
     sid = request.sid
-    disconnected_room = None
-    user_name = "Unknown User" # Default
+    user_name = sid_to_user.pop(sid, "Someone") # Get username and remove from mapping
 
-    # Find the room the disconnecting SID was in
-    for room_code, room_data in list(rooms.items()): # Iterate over copy if modifying dict
+    disconnected_room = None
+    # Find which room the SID belonged to
+    for room_code, room_data in rooms.items():
         if sid in room_data.get("sids", set()):
             disconnected_room = room_code
-            user_name = session.get('name', user_name) # Try to get name from session
             break
 
-    app.logger.debug(f"Disconnect attempt: SID={sid}. Found in room: '{disconnected_room}'. User from session (if available): '{user_name}'")
+    app.logger.debug(f"[Disconnect] SID={sid}. User='{user_name}'. Found in room: '{disconnected_room}'.")
 
     if disconnected_room and disconnected_room in rooms:
-        leave_room(disconnected_room) # Tell SocketIO user left room
+        # Formally leave the SocketIO room
+        leave_room(disconnected_room)
 
-        # Update our tracker
-        if sid in rooms[disconnected_room]["sids"]:
-             rooms[disconnected_room]["sids"].remove(sid)
-        rooms[disconnected_room]["members"] = max(0, rooms[disconnected_room]["members"] - 1)
+        # Update our custom room tracker
+        room_info = rooms[disconnected_room]
+        if sid in room_info["sids"]:
+             room_info["sids"].remove(sid)
+             room_info["members"] = max(0, room_info["members"] - 1) # Decrement, ensure non-negative
+             current_members = room_info["members"]
+             app.logger.info(f"User '{user_name}' (SID: {sid}) DISCONNECTED from room '{disconnected_room}'. Remaining members: {current_members}.")
 
-        current_members = rooms[disconnected_room]["members"]
-        app.logger.info(f"User '{user_name}' (SID: {sid}) DISCONNECTED from room '{disconnected_room}'. Remaining members: {current_members}.")
+             # Notify remaining users in the room about the departure
+             leave_message_content = f"{user_name} has left the room."
+             leave_ts = datetime.datetime.now(pytz.utc).isoformat()
+             leave_message = {
+                 "name": "System",
+                 "message": leave_message_content,
+                 "timestamp": leave_ts,
+                 "user_id": None,
+                 "isSystem": True
+                 }
+             socketio.emit('message', leave_message, to=disconnected_room)
 
-        # Notify remaining users
-        leave_message_content = f"{user_name} has left the room."
-        leave_ts = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
-        leave_message = {
-            "name": "System", "message": leave_message_content,
-            "timestamp": leave_ts, "user_id": None, "isSystem": True
-            }
-        socketio.emit('message', leave_message, to=disconnected_room)
+             # Emit updated user count to the room
+             emit_user_count(disconnected_room)
 
-        # Clean up empty private room tracker (keep PUBLIC)
-        if current_members <= 0 and disconnected_room != "PUBLIC":
-            try:
-                del rooms[disconnected_room]
-                app.logger.info(f"Private room tracker '{disconnected_room}' deleted as it became empty.")
-            except KeyError:
-                 app.logger.warning(f"Attempted to delete empty room tracker '{disconnected_room}', but it was already gone.")
-        elif current_members <= 0 and disconnected_room == "PUBLIC":
-             app.logger.info(f"Public room '{disconnected_room}' is empty, tracker retained.")
+             # Clean up memory for empty PRIVATE rooms
+             # Keep PUBLIC room tracker even if empty
+             if current_members <= 0 and disconnected_room != "PUBLIC":
+                 try:
+                     del rooms[disconnected_room]
+                     app.logger.info(f"Private room tracker '{disconnected_room}' deleted as it became empty.")
+                 except KeyError:
+                      # Should not happen if check was done correctly, but log just in case
+                      app.logger.warning(f"Attempted to delete empty room tracker '{disconnected_room}', but it was already gone (potential race condition?).")
+             elif current_members <= 0 and disconnected_room == "PUBLIC":
+                  # Reset PUBLIC room members to 0, but keep the tracker entry
+                  room_info["members"] = 0 # Ensure it's explicitly 0
+                  app.logger.info(f"Public room '{disconnected_room}' is empty, tracker retained with 0 members.")
+
+        else:
+            # SID was not in the sids set, even though it was mapped to the room. This indicates an inconsistency.
+            app.logger.warning(f"Disconnect inconsistency: SID {sid} was mapped to room '{disconnected_room}', but not found in its 'sids' set.")
+            # Still try to emit count update as a safety measure
+            emit_user_count(disconnected_room)
+
     else:
-        app.logger.warning(f"Socket disconnected (SID: {sid}), but SID was not found in any active room tracker.")
+        app.logger.warning(f"Socket disconnected (SID: {sid}, User: '{user_name}'), but SID was not found in any active room tracker or the room tracker was missing.")
+        # Cannot send leave message or update count if we don't know the room
 
 
 @socketio.on('message')
 def handle_message(data):
     """Handles incoming chat messages from clients."""
     sid = request.sid
+
+    # Basic validation of incoming data format
     if not isinstance(data, dict) or 'data' not in data:
         app.logger.warning(f"Invalid message format received from SID {sid}. Data: {data}")
-        socketio.emit('error', {'message': 'Invalid message format.'}, room=sid); return
+        socketio.emit('error', {'message': 'Invalid message format.'}, room=sid)
+        return
 
-    message_text = str(data.get('data', ''))
+    # Extract necessary info
+    message_text = str(data.get('data', '')) # Get message text, default to empty string
     room_code = session.get('room')
     user_name = session.get('name')
     user_id = session.get('user_id')
 
-    app.logger.debug(f"[Message] SID={sid}, User={user_name}({user_id}), Room='{room_code}', Rcvd='{message_text[:50]}...'")
+    app.logger.debug(f"[Message Rcvd] SID={sid}, User='{user_name}'(ID:{user_id}), Room='{room_code}', Msg='{message_text[:50]}...'")
 
+    # Validate session and room membership consistency
     if not all([room_code, user_name, user_id]):
-        app.logger.warning(f"Message REJECTED from SID {sid}: Missing session data. Data: {message_text[:50]}...")
-        socketio.emit('error', {'message': 'Cannot send message: Invalid session.'}, room=sid); return
+        app.logger.warning(f"Message REJECTED from SID {sid}: Missing essential session data (room, name, or id).")
+        socketio.emit('error', {'message': 'Cannot send message: Your session is invalid. Please refresh.'}, room=sid)
+        return
 
-    # Verify SID is actually in the room claimed by session (consistency check)
+    # Cross-check: Does the room tracker confirm this SID belongs here?
     if room_code not in rooms or sid not in rooms[room_code].get("sids", set()):
-         app.logger.error(f"Message REJECTED from SID {sid}: Session/tracker mismatch for room '{room_code}'.")
-         socketio.emit('error', {'message': 'Room connection mismatch. Please refresh.'}, room=sid)
+         app.logger.error(f"Message REJECTED from SID {sid} (User: {user_name}): Session/tracker mismatch for room '{room_code}'. Possible stale session or tracker issue.")
+         socketio.emit('error', {'message': 'Room connection mismatch. Please refresh the page.'}, room=sid)
+         # Optional: Force disconnect if this happens consistently? disconnect(sid)
          return
 
+    # --- Process the message ---
     message_content = message_text.strip()
     if not message_content:
         app.logger.debug(f"Empty message REJECTED from {user_name} (SID: {sid}) in room '{room_code}'.")
+        # Optionally, send a quiet feedback to the user?
+        # socketio.emit('info', {'message': 'Cannot send empty messages.'}, room=sid)
         return
 
-    MAX_MSG_LENGTH = 2000
+    MAX_MSG_LENGTH = 2000 # Define a max length
     if len(message_content) > MAX_MSG_LENGTH:
-        app.logger.warning(f"Message REJECTED from {user_name} (SID: {sid}): Too long ({len(message_content)} chars).")
-        socketio.emit('error', {'message': f'Message is too long (max {MAX_MSG_LENGTH} characters).'}, room=sid); return
+        app.logger.warning(f"Message REJECTED from {user_name} (SID: {sid}) in room '{room_code}': Too long ({len(message_content)} chars).")
+        socketio.emit('error', {'message': f'Message rejected: Exceeds maximum length of {MAX_MSG_LENGTH} characters.'}, room=sid)
+        return
 
-    # Save the message to the database FIRST
+    # Save message to Database *FIRST*
     if not save_message(room_code, user_id, user_name, message_content):
-        app.logger.error(f"Failed to save message to DB for room '{room_code}' from {user_name} (SID: {sid}).")
-        socketio.emit('error', {'message': 'Failed to save message to server. Please try again.'}, room=sid); return
+        app.logger.error(f"Failed to SAVE message to DB for room '{room_code}' from {user_name} (SID: {sid}). Message: '{message_content[:50]}...'")
+        # Inform the sending user about the failure
+        socketio.emit('error', {'message': 'Failed to save message to the server. Please try sending again.'}, room=sid)
+        return # Stop processing if DB save failed
 
-    # Broadcast the message to the room
-    timestamp_now = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
+    # Prepare message data for broadcasting
+    timestamp_now_iso = datetime.datetime.now(pytz.utc).isoformat()
     content_to_broadcast = {
         "name": user_name,
-        "message": message_content, # Send the original (stripped) message
-        "timestamp": timestamp_now,
+        "message": message_content, # Send the sanitized, stripped message
+        "timestamp": timestamp_now_iso,
         "user_id": user_id,
-        "isSystem": False # Regular user message
+        "isSystem": False # It's a regular user message
         }
+
+    # Broadcast the message to everyone in the room (including the sender)
     socketio.emit('message', content_to_broadcast, to=room_code)
-    app.logger.debug(f"Message from '{user_name}' (SID: {sid}) in room '{room_code}' saved and broadcasted.")
+    app.logger.debug(f"Message from '{user_name}' (SID: {sid}) in room '{room_code}' saved and BROADCASTED.")
 
 
 # --- General Error Handlers ---
 @socketio.on_error_default
 def default_error_handler(e):
     """Log unhandled SocketIO errors."""
-    sid = request.sid if request else 'N/A'
+    sid = request.sid if request else 'Unknown SID'
     app.logger.error(f"Unhandled SocketIO Error: {e} (SID: {sid})", exc_info=True)
-    # Optionally emit a generic error back to the client
+    # Attempt to notify the specific client if possible
     if request and sid:
-        try: socketio.emit('error', {'message': 'An internal server error occurred via SocketIO.'}, room=sid)
-        except Exception as emit_err: app.logger.error(f"Error emitting error message to SID {sid}: {emit_err}")
+        try:
+            socketio.emit('error', {'message': 'An unexpected server error occurred with your connection.'}, room=sid)
+        except Exception as emit_err:
+            app.logger.error(f"Failed to emit generic error message to SID {sid} after internal error: {emit_err}")
 
 
 @app.errorhandler(404)
 def page_not_found(e):
     """Handle 404 Not Found errors."""
-    app.logger.warning(f"404 Not Found: {request.url} (Referrer: {request.referrer})")
+    app.logger.warning(f"404 Not Found: Request for '{request.url}' from {request.remote_addr}. Referrer: {request.referrer}")
     return render_template('404.html'), 404
 
 @app.errorhandler(500)
 def internal_server_error(e):
     """Handle 500 Internal Server errors."""
-    app.logger.error(f"500 Internal Server Error handling request for {request.url}: {e}", exc_info=True)
-    close_db(e)
+    # Extract original exception if available (useful for specific handling)
+    original_exception = getattr(e, "original_exception", e)
+    app.logger.error(f"500 Internal Server Error handling request for {request.url} from {request.remote_addr}: {original_exception}", exc_info=True)
+    # Ensure DB connection associated with this request context is closed
+    close_db(original_exception)
     return render_template('500.html'), 500
 
-@app.errorhandler(ConnectionError)
+@app.errorhandler(ConnectionError) # Catch our specific DB connection error
 def handle_db_connection_error(e):
     """Handle database connection errors gracefully during requests."""
-    app.logger.critical(f"Database Connection Error during request {request.url}: {e}", exc_info=app.debug)
-    close_db(e) # Ensure context cleanup
-    flash("The service is temporarily unavailable due to a database connection issue. Please try again later.", "error")
-    if request.endpoint and request.endpoint not in ['static', 'home']:
+    app.logger.critical(f"Database Connection Error during request {request.url} from {request.remote_addr}: {e}", exc_info=app.debug)
+    close_db(e) # Attempt cleanup
+    flash("The service is temporarily unavailable due to a database connection issue. Please try again later or contact support.", "error")
+    # Try redirecting to home if it's not a static asset or home itself
+    if request.endpoint and request.endpoint not in ['static', 'home', 'logout']:
          return redirect(url_for('home'))
-    return render_template('500.html', error_message="Database connection error."), 503
+    # Fallback to showing a specific error page/message
+    return render_template('500.html', error_message="Database connection failed. The application cannot currently function."), 503 # Service Unavailable
 
-
-@app.errorhandler(Exception)
+@app.errorhandler(Exception) # Generic handler for other exceptions
 def handle_exception(e):
-    """Handle other uncaught exceptions."""
-    # Log detailed error
-    app.logger.error(f"Unhandled Exception handling request for {request.url}: {e}", exc_info=True)
+    """Handle other uncaught exceptions during request processing."""
+    app.logger.error(f"Unhandled Exception handling request for {request.url} from {request.remote_addr}: {e}", exc_info=True)
 
-    # Specific handling based on error type if needed
+    # Special handling for specific types if needed
     if isinstance(e, (pymysql.MySQLError)):
-        flash("An unexpected database error occurred.", "error")
-    # Add other specific error types if necessary
+        # Logged already, potentially show generic DB error to user
+        flash("An unexpected database problem occurred. Please try again later.", "error")
+    # Handle other specific exceptions if necessary...
+    # elif isinstance(e, SomeOtherError):
+    #     flash("Specific message for SomeOtherError", "warning")
 
-    # Ensure DB connection is closed
+    # Ensure DB connection tied to this failing request is closed
     close_db(e)
 
     # Render generic 500 page
@@ -1074,19 +1250,26 @@ def handle_exception(e):
 # --- Run the App ---
 if __name__ == "__main__":
     port = int(os.getenv('PORT', 5000))
-    host = os.getenv('HOST', '0.0.0.0')
+    host = os.getenv('HOST', '0.0.0.0') # Listen on all available interfaces
     debug_mode = app.config['DEBUG']
 
-    app.logger.info(f"Starting Flask-SocketIO application...")
-    app.logger.info(f" ---> Host: {host}")
-    app.logger.info(f" ---> Port: {port}")
-    app.logger.info(f" ---> Debug Mode: {debug_mode}")
-    app.logger.info(f" ---> Async Mode: {ASYNC_MODE or 'Werkzeug (Default - Dev Only!)'}")
+    app.logger.info(f"--- Starting Flask-SocketIO Chat Application ---")
+    app.logger.info(f" Configuration:")
+    app.logger.info(f"   - Host: {host}")
+    app.logger.info(f"   - Port: {port}")
+    app.logger.info(f"   - Debug Mode: {'ON' if debug_mode else 'OFF'}")
+    app.logger.info(f"   - Async Mode: {ASYNC_MODE or 'Werkzeug (Default - Development Only!)'}")
+    app.logger.info(f"   - Database Host: {DB_CONFIG['host']}")
+    app.logger.info(f"   - Database Name: {DB_CONFIG['database']}")
+    app.logger.info(f"-----------------------------------------------")
 
     try:
+        # use_reloader should ideally be False in production, even if debug is technically True
+        # for certain Werkzeug features. Let debug control it simply here.
         socketio.run(app, host=host, port=port, debug=debug_mode, use_reloader=debug_mode)
     except Exception as start_error:
-         app.logger.critical(f"Failed to start application: {start_error}", exc_info=True)
-         sys.exit(1)
+         app.logger.critical(f"##### APPLICATION FAILED TO START #####: {start_error}", exc_info=True)
+         print(f"\nCRITICAL ERROR: Failed to start application: {start_error}\n", file=sys.stderr)
+         sys.exit(1) # Exit with error code
 
 # --- END OF FILE app.py ---

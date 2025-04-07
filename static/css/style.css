@@ -1,12 +1,17 @@
+/* --- START OF FILE style.css --- */
+
 /* --- General Styles --- */
 :root {
     --primary-color: #007bff;
+    --primary-darker: #0056b3;
     --secondary-color: #6c757d;
     --success-color: #28a745;
     --danger-color: #dc3545;
     --warning-color: #ffc107;
     --info-color: #17a2b8;
     --light-color: #f8f9fa;
+    --medium-light-gray: #e9ecef;
+    /* Added */
     --dark-color: #343a40;
     --body-bg: #f4f7fb;
     --container-bg: #ffffff;
@@ -14,8 +19,16 @@
     --muted-color: #6c757d;
     --border-color: #dee2e6;
     --border-radius: 8px;
-    --box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    --box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    /* Slightly deeper shadow */
     --font-family: 'Roboto', -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --font-size-base: 1rem;
+    /* 16px */
+    --font-size-sm: 0.875rem;
+    /* 14px */
+    --font-size-xs: 0.75rem;
+    /* 12px */
+    --line-height-base: 1.6;
 }
 
 *,
@@ -27,22 +40,19 @@
 }
 
 html {
-    font-size: 16px;
-    /* Base font size */
+    font-size: var(--font-size-base);
 }
 
 body {
     font-family: var(--font-family);
     background-color: var(--body-bg);
     color: var(--text-color);
-    line-height: 1.6;
+    line-height: var(--line-height-base);
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    /* Align top for potential scroll */
     min-height: 100vh;
     padding: 15px;
-    /* Add padding for smaller screens */
 }
 
 /* --- Container Styles --- */
@@ -52,16 +62,12 @@ body {
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
     overflow: hidden;
-    /* Keep overflow hidden for general containers */
     margin-top: 20px;
-    /* Add some margin from top */
     margin-bottom: 20px;
-    /* Add margin at bottom */
 }
 
 .auth-container {
     max-width: 420px;
-    /* Specific width for auth forms */
 }
 
 .error-container {
@@ -71,67 +77,94 @@ body {
 
 .dashboard-container {
     max-width: 600px;
-    /* Slightly wider for admin link */
 }
 
 .admin-container {
-    /* Style for admin pages */
-    max-width: 900px;
-    /* Wider container for tables */
+    max-width: 950px;
+    /* Wider for tables */
 }
 
 .chat-container {
-    max-width: 700px;
-    height: 90vh;
-    /* Use viewport height */
-    min-height: 400px;
-    /* Minimum height */
+    max-width: 750px;
+    /* Slightly wider chat */
+    height: calc(100vh - 60px);
+    /* Use viewport height minus padding/margins */
+    min-height: 450px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    /* Prevent container itself from scrolling */
 }
 
 
 /* --- Header Styles --- */
 .header {
-    background-color: var(--primary-color);
+    background: linear-gradient(to right, var(--primary-color), #0056b3);
+    /* Gradient background */
     color: white;
-    padding: 20px 25px;
+    padding: 18px 25px;
+    /* Slightly adjusted padding */
     text-align: center;
     position: relative;
-    /* For absolute positioned links */
     flex-shrink: 0;
-    /* Prevent header shrinking */
+    border-bottom: 3px solid var(--primary-darker);
+    /* Bottom border accent */
 }
 
 .header h1 {
-    font-size: 1.8rem;
-    /* Responsive font size */
+    font-size: 1.75rem;
     margin: 0;
     font-weight: 500;
+    letter-spacing: 0.5px;
 }
 
 .header-links {
     position: absolute;
-    top: 15px;
-    right: 15px;
-    font-size: 0.9em;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+    font-size: var(--font-size-sm);
+    display: flex;
+    /* Use flexbox for alignment */
+    align-items: center;
+}
+
+.header-links span,
+.header-links a {
+    color: rgba(255, 255, 255, 0.9);
+    /* Slightly transparent */
+    text-decoration: none;
+    margin: 0 6px;
+    /* Increased spacing */
+    transition: color 0.2s ease;
 }
 
 .header-links span {
-    margin-right: 5px;
-}
-
-.header-links a {
-    color: white;
-    text-decoration: none;
-    margin: 0 3px;
-    /* Spacing between links */
+    font-weight: 500;
+    /* Make welcome name slightly bolder */
 }
 
 .header-links a:hover {
+    color: white;
     text-decoration: underline;
+}
+
+/* Specific additions for chat header */
+.chat-header-info {
+    position: absolute;
+    top: 50%;
+    left: 20px;
+    transform: translateY(-50%);
+    font-size: var(--font-size-sm);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.chat-header-info .user-count-display {
+    /* Basic styling for count */
+    font-weight: 500;
+    margin-left: 5px;
+    background-color: rgba(255, 255, 255, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
 }
 
 
@@ -139,21 +172,19 @@ body {
 .main {
     padding: 25px;
     flex-grow: 1;
-    /* Allow main content to grow */
     display: flex;
-    /* Use flex for chat layout */
     flex-direction: column;
     overflow: hidden;
-    /* Hide overflow for main chat area */
 }
 
 .error-container .main,
 .dashboard-container .main,
 .auth-container .main,
 .admin-container .main {
-    /* Apply block display to these */
     display: block;
     /* Override flex for simple layouts */
+    padding: 30px;
+    /* Increase padding slightly */
 }
 
 
@@ -161,22 +192,25 @@ body {
 .auth-form h2,
 .auth-form p {
     text-align: center;
-    margin-bottom: 15px;
+    margin-bottom: 20px;
+    /* Increased spacing */
 }
 
 .auth-form h2 {
-    font-size: 1.5rem;
+    font-size: 1.6rem;
     color: var(--dark-color);
     font-weight: 500;
 }
 
 .auth-form p {
-    font-size: 0.95rem;
+    font-size: 1rem;
+    /* Slightly larger text */
     color: var(--muted-color);
 }
 
 .form-group {
-    margin-bottom: 15px;
+    margin-bottom: 18px;
+    /* Increased spacing */
 }
 
 /* Input fields */
@@ -184,15 +218,24 @@ input[type="text"],
 input[type="email"],
 input[type="password"],
 input[type="tel"],
-/* Added for OTP */
+input[type="checkbox"],
+textarea {
+    font-family: inherit;
+    font-size: 1rem;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
 textarea {
     width: 100%;
     padding: 12px 15px;
     border: 1px solid var(--border-color);
     border-radius: 5px;
-    font-size: 1rem;
-    font-family: inherit;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    background-color: #fff;
+    /* Ensure background is white */
 }
 
 input:focus,
@@ -202,12 +245,34 @@ textarea:focus {
     box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.2);
 }
 
+/* Checkbox style */
+.form-group-checkbox {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Center checkbox */
+    font-size: var(--font-size-sm);
+    color: var(--muted-color);
+}
+
+.form-group-checkbox input[type="checkbox"] {
+    margin-right: 8px;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.form-group-checkbox label {
+    cursor: pointer;
+    user-select: none;
+    /* Prevent text selection */
+}
+
+
 /* Buttons */
 .btn {
     display: inline-block;
-    /* Changed from block to inline-block */
     width: 100%;
-    /* Make buttons take full width by default */
     padding: 12px 20px;
     border: none;
     border-radius: 5px;
@@ -216,17 +281,22 @@ textarea:focus {
     text-align: center;
     text-decoration: none;
     cursor: pointer;
-    transition: background-color 0.2s ease, transform 0.1s ease;
+    transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
     box-sizing: border-box;
-    /* Ensure padding included in width */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    /* Subtle shadow */
 }
 
 .btn:hover {
     transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    /* Slightly larger shadow on hover */
 }
 
 .btn:active {
     transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    /* Smaller shadow on active */
 }
 
 .btn-block {
@@ -234,15 +304,13 @@ textarea:focus {
     display: block;
 }
 
-/* Helper class if block is explicitly needed */
-
 .btn-primary {
     background-color: var(--primary-color);
     color: white;
 }
 
 .btn-primary:hover {
-    background-color: #0056b3;
+    background-color: var(--primary-darker);
 }
 
 .btn-secondary {
@@ -275,14 +343,17 @@ textarea:focus {
 /* Form Links & Separators */
 .form-links {
     text-align: center;
-    margin-top: 15px;
-    font-size: 0.9em;
+    margin-top: 20px;
+    /* Increased spacing */
+    font-size: var(--font-size-sm);
+    /* Smaller links */
 }
 
 .form-links a {
     color: var(--primary-color);
     text-decoration: none;
-    margin: 0 5px;
+    margin: 0 8px;
+    /* Increased spacing */
 }
 
 .form-links a:hover {
@@ -290,6 +361,7 @@ textarea:focus {
 }
 
 .or-separator {
+    /* Same styling as before */
     position: relative;
     margin: 25px 0;
     color: #aaa;
@@ -299,7 +371,6 @@ textarea:focus {
 
 .or-separator span {
     background-color: var(--container-bg);
-    /* Match container background */
     padding: 0 10px;
     position: relative;
     z-index: 1;
@@ -316,21 +387,17 @@ textarea:focus {
     z-index: 0;
 }
 
-/* Specific background for separator in dashboard sections */
 .dashboard-container .or-separator span,
 .admin-container .or-separator span {
-    /* Added admin */
     background: var(--light-color);
-    /* Use light color for section box background */
 }
 
+
 /* --- Flash Messages --- */
-/* Placed in includes/_flash_messages.html */
 .flash-messages {
     padding: 0;
     list-style: none;
     margin: 0 0 20px 0;
-    /* Space below flash messages */
 }
 
 .alert {
@@ -339,9 +406,14 @@ textarea:focus {
     border: 1px solid transparent;
     border-radius: 5px;
     font-size: 0.95em;
-    text-align: center;
+    text-align: left;
+    /* Align text left */
     opacity: 1;
     transition: opacity 0.5s ease-out;
+    position: relative;
+    /* For potential close button */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    /* Add shadow */
 }
 
 .alert-success {
@@ -352,7 +424,6 @@ textarea:focus {
 
 .alert-error,
 .alert-danger {
-    /* Combined danger and error */
     color: #721c24;
     background-color: #f8d7da;
     border-color: #f5c6cb;
@@ -370,8 +441,10 @@ textarea:focus {
     border-color: #bee5eb;
 }
 
+
 /* --- Accessibility --- */
 .sr-only {
+    /* Same styling as before */
     position: absolute;
     width: 1px;
     height: 1px;
@@ -390,9 +463,7 @@ textarea:focus {
 
 .error-actions .btn {
     margin-bottom: 10px;
-    /* Space buttons */
     width: auto;
-    /* Allow buttons to size naturally */
     display: inline-block;
     margin-right: 10px;
 }
@@ -403,35 +474,45 @@ textarea:focus {
 .dashboard-container .main h3,
 .admin-container .main h2,
 .admin-container .main h3 {
-    /* Added admin */
     text-align: center;
-    margin-bottom: 15px;
-    color: #333;
+    margin-bottom: 20px;
+    /* Increased spacing */
+    color: var(--dark-color);
+    font-weight: 500;
 }
 
 .dashboard-container .main h3,
 .admin-container .main h3 {
-    /* Added admin */
-    margin-top: 20px;
+    margin-top: 25px;
+    /* Increased spacing */
     border-bottom: 1px solid #eee;
-    padding-bottom: 8px;
+    padding-bottom: 10px;
+    /* Increased padding */
     font-weight: 600;
+    text-align: left;
+    /* Align section headers left */
+    font-size: 1.25rem;
 }
 
 .section-box {
     background-color: var(--light-color);
-    padding: 20px;
+    padding: 25px;
+    /* Increased padding */
     border-radius: var(--border-radius);
-    margin-bottom: 20px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    margin-bottom: 25px;
+    /* Increased spacing */
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.07);
+    /* Subtle shadow */
+    border: 1px solid #eee;
+    /* Light border */
 }
 
 .room-form,
 .public-chat-link {
-    margin-bottom: 20px;
+    margin-bottom: 0;
+    /* Remove bottom margin as section box provides it */
 }
 
-/* Note: or-separator span background handled above */
 .divider {
     border: 0;
     height: 1px;
@@ -440,21 +521,21 @@ textarea:focus {
 }
 
 .public-chat-link p {
-    color: #666;
-    font-size: 0.95em;
-    text-align: center;
+    color: #555;
+    font-size: 1rem;
+    text-align: left;
+    /* Align left */
     margin-bottom: 15px;
 }
 
 /* Admin Specific Styles */
 .admin-nav {
-    margin-bottom: 20px;
+    margin-bottom: 25px;
     text-align: center;
 }
 
 .admin-nav .btn {
     width: auto;
-    /* Let buttons size naturally */
     margin: 5px 10px;
 }
 
@@ -467,20 +548,21 @@ textarea:focus {
 .user-table th,
 .user-table td {
     border: 1px solid var(--border-color);
-    padding: 8px 12px;
+    padding: 10px 14px;
+    /* Increased padding */
     text-align: left;
     vertical-align: middle;
-    /* Align vertically */
+    font-size: var(--font-size-sm);
 }
 
 .user-table th {
-    background-color: var(--light-color);
+    background-color: var(--medium-light-gray);
     font-weight: 600;
+    color: var(--dark-color);
 }
 
 .user-table tr:nth-child(even) {
-    background-color: #f8f9fa;
-    /* Slightly different bg for even rows */
+    background-color: var(--light-color);
 }
 
 .user-table .actions form {
@@ -488,88 +570,98 @@ textarea:focus {
     margin: 0 5px 0 0;
 }
 
-.user-table .actions .btn-danger {
-    padding: 4px 8px;
-    font-size: 0.8em;
+.user-table .actions .btn-danger,
+.user-table .actions .btn-secondary {
+    /* Style edit button too */
+    padding: 5px 10px;
+    /* Slightly larger small buttons */
+    font-size: var(--font-size-xs);
     width: auto;
-    /* Override default full width */
     display: inline-block;
+    box-shadow: none;
+    /* Remove shadow for small buttons */
+}
+
+.user-table .actions .btn-danger:hover,
+.user-table .actions .btn-secondary:hover {
+    transform: none;
+    /* Disable transform for small buttons */
+    filter: brightness(90%);
+    /* Darken slightly on hover */
 }
 
 .table-responsive {
     overflow-x: auto;
-    /* Allow horizontal scroll on small screens */
+    /* Enable horizontal scroll */
+    padding-bottom: 10px;
+}
+
+.table-note {
+    font-size: var(--font-size-sm);
+    color: var(--muted-color);
+    margin-top: 5px;
 }
 
 
 /* --- Styles for Chat Interfaces --- */
 .chat-container .main {
-    padding-bottom: 10px;
-    /* Reduce bottom padding */
+    padding-bottom: 15px;
 }
 
+/* Consistent bottom padding */
+
 .room-code-display {
-    font-size: 0.9em;
+    font-size: var(--font-size-sm);
     color: var(--muted-color);
     margin-bottom: 10px;
     text-align: center;
-    font-weight: normal;
-    padding: 5px;
-    background-color: #eee;
+    font-weight: 500;
+    padding: 6px 10px;
+    background-color: var(--medium-light-gray);
     border-radius: 4px;
     flex-shrink: 0;
-    /* Prevent shrinking */
 }
 
 .room-code-display .code {
     font-weight: bold;
-    color: #333;
+    color: var(--dark-color);
 }
 
 .messages {
     flex-grow: 1;
-    /* Take available space */
     overflow-y: auto;
-    /* Allow vertical scrolling */
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
     padding: 15px;
-    background-color: var(--container-bg);
+    background-color: #f9f9f9;
+    /* Slightly off-white message background */
     margin-bottom: 15px;
     scroll-behavior: smooth;
 }
 
-#chat-flash-messages {
-    position: absolute;
-    bottom: 70px;
-    /* Adjust based on send_message height */
-    left: 50%;
-    transform: translateX(-50%);
-    width: 80%;
-    max-width: 500px;
-    z-index: 100;
-    pointer-events: none;
-    /* Allow clicks through */
-}
+/* Animated message appearance */
+@keyframes fadeInSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
 
-#chat-flash-messages .alert {
-    padding: 8px 12px;
-    margin-bottom: 5px;
-    border-radius: 5px;
-    font-size: 0.85em;
-    text-align: center;
-    opacity: 1;
-    transition: opacity 0.5s ease-out;
-    pointer-events: auto;
-    /* Make alerts clickable if needed */
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .message-item {
     display: flex;
     flex-direction: column;
     margin-bottom: 12px;
-    max-width: 85%;
+    max-width: 80%;
+    /* Slightly narrower */
+    /* Apply animation */
+    animation: fadeInSlideUp 0.3s ease-out forwards;
+    opacity: 0;
+    /* Start hidden */
 }
 
 .sent-message {
@@ -588,18 +680,20 @@ textarea:focus {
     word-wrap: break-word;
     max-width: 100%;
     position: relative;
-    /* For potential future pseudo-elements */
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    /* Subtle shadow */
 }
 
 .sent-message .message-bubble {
-    background-color: var(--primary-color);
+    background: linear-gradient(to bottom right, var(--primary-color), #0062cc);
+    /* Gradient */
     color: white;
     border-bottom-right-radius: 5px;
 }
 
 .received-message .message-bubble {
-    background-color: #e9ecef;
-    color: var(--dark-color);
+    background-color: var(--medium-light-gray);
+    color: var(--text-color);
     border-bottom-left-radius: 5px;
 }
 
@@ -607,27 +701,32 @@ textarea:focus {
     font-weight: bold;
     display: block;
     margin-bottom: 4px;
-    font-size: 0.85em;
+    font-size: 0.8rem;
+    /* Smaller sender name */
 }
 
 .received-message .message-sender {
     color: var(--primary-color);
-    /* Make sender name stand out */
+    opacity: 0.9;
+    /* Make slightly transparent */
 }
 
 .sent-message .message-sender {
     display: none;
-    /* Hide sender for own messages */
 }
 
+/* Hide own sender name */
+
 .message-content {
-    line-height: 1.4;
+    line-height: 1.45;
+    /* Improve readability */
 }
 
 .message-timestamp {
-    font-size: 0.7em;
+    font-size: 0.7rem;
+    /* Smaller timestamp */
     color: var(--muted-color);
-    margin-top: 4px;
+    margin-top: 5px;
     padding: 0 5px;
 }
 
@@ -640,57 +739,88 @@ textarea:focus {
 }
 
 .system-message {
+    /* Shared styles with status indicator */
     color: var(--muted-color);
     font-style: italic;
-    font-size: 0.85em;
+    font-size: 0.8rem;
+    /* Slightly smaller */
     text-align: center;
     width: 100%;
-    padding: 8px 0;
+    padding: 10px 15px;
     align-self: center;
-    max-width: 100%;
-    /* Ensure it doesn't overflow */
-    /* System messages don't use bubbles by default */
+    max-width: 90%;
+    /* Center alignment */
+    margin: 8px 0;
+    background-color: rgba(233, 236, 239, 0.7);
+    /* Semi-transparent light gray */
+    border-radius: 5px;
+    border: 1px dashed var(--border-color);
+    box-sizing: border-box;
+    /* Include padding/border in width */
+    /* Use animation */
+    animation: fadeInSlideUp 0.3s ease-out forwards;
+    opacity: 0;
 }
 
 .system-message .message-content {
     padding: 0;
-    /* No extra padding needed */
 }
 
-
+/* No extra padding needed */
 .status-indicator {
-    /* Inherit system-message styles but make it visually distinct */
+    /* Inherits system-message styles, slightly bolder */
     font-weight: bold;
-    background-color: #f0f0f0;
-    /* Light grey background */
+    font-style: normal;
+    /* Override italic */
+}
+
+#chat-flash-messages {
+    /* Positioned absolutely for chat interface */
+    position: absolute;
+    bottom: 75px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 500px;
+    z-index: 100;
+    pointer-events: none;
+    /* Allow clicks through container */
+}
+
+#chat-flash-messages .alert {
+    /* Specific styling for chat flashes */
+    padding: 8px 12px;
+    margin-bottom: 8px;
     border-radius: 5px;
-    margin: 10px auto;
-    /* Center with auto margins */
-    padding: 10px 15px;
-    color: var(--muted-color);
-    font-style: italic;
-    font-size: 0.85em;
+    font-size: var(--font-size-xs);
+    /* Smaller */
     text-align: center;
-    width: auto;
-    /* Fit content */
-    display: inline-block;
-    /* Allows centering with text-align on parent or margin:auto */
-    align-self: center;
-    /* Center vertically if in flex container */
-    max-width: 90%;
-    border: 1px dashed var(--border-color);
-    /* Dashed border */
+    opacity: 1;
+    transition: opacity 0.5s ease-out, transform 0.3s ease-out;
+    /* Add transform transition */
+    pointer-events: auto;
+    /* Make alerts themselves interactable */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+    transform: translateY(0);
+    /* Initial state */
+}
+
+/* Optional: Add disappearing animation for chat flashes */
+#chat-flash-messages .alert.fade-out {
+    opacity: 0;
+    transform: translateY(10px);
 }
 
 .send_message {
     display: flex;
     align-items: flex-end;
-    /* Align items to bottom */
-    padding: 5px 0;
-    /* Adjust padding */
+    padding: 10px 0;
     gap: 10px;
     flex-shrink: 0;
-    /* Prevent shrinking */
+    border-top: 1px solid var(--border-color);
+    /* Add separator */
+    margin-top: 10px;
+    /* Space above input */
 }
 
 .send_message textarea {
@@ -698,50 +828,56 @@ textarea:focus {
     padding: 10px 15px;
     border: 1px solid var(--border-color);
     border-radius: 20px;
-    /* Rounded corners */
     resize: none;
-    /* Disable manual resize */
-    font-size: 1em;
+    font-size: 1rem;
     line-height: 1.4;
     max-height: 100px;
-    /* Limit max height */
     overflow-y: auto;
-    /* Scroll if content exceeds max-height */
     box-sizing: border-box;
-    transition: border-color 0.2s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    background-color: #fff;
 }
 
 .send_message textarea:focus {
     border-color: var(--primary-color);
     outline: none;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
 }
 
 .send_message button {
-    width: 40px;
-    height: 40px;
+    width: 42px;
+    height: 42px;
+    /* Slightly larger */
     padding: 0;
     background-color: var(--primary-color);
     color: white;
     border: none;
     border-radius: 50%;
-    /* Circular button */
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    transition: background-color 0.2s ease, transform 0.1s ease;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    /* Prevent shrinking */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .send_message button:hover {
-    background-color: #0056b3;
+    background-color: var(--primary-darker);
+    transform: scale(1.05);
+    /* Slight grow */
+}
+
+.send_message button:active {
+    transform: scale(1);
+    /* Reset scale */
 }
 
 .send_message button:disabled {
     background-color: #cccccc;
     cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
 }
 
 .send_message button svg {
@@ -754,65 +890,7 @@ textarea:focus {
 @media (max-width: 768px) {
     body {
         align-items: center;
-        /* Re-center on smaller screens */
-    }
-
-    .header h1 {
-        font-size: 1.6rem;
-    }
-
-    .main {
-        padding: 20px;
-    }
-
-    .chat-container {
-        height: 85vh;
-        /* Adjust height slightly */
-    }
-
-    #chat-flash-messages {
-        width: 90%;
-    }
-
-    .admin-container {
-        max-width: 95%;
-        /* Allow wider admin table */
-    }
-
-    .user-table th,
-    .user-table td {
-        padding: 6px 8px;
-        font-size: 0.9em;
-    }
-}
-
-@media (max-width: 480px) {
-    html {
-        font-size: 15px;
-    }
-
-    /* Slightly smaller base font */
-    .header h1 {
-        font-size: 1.4rem;
-    }
-
-    .header-links {
-        font-size: 0.8em;
-        top: 12px;
-        right: 10px;
-    }
-
-    .header-links span {
-        display: none;
-    }
-
-    /* Hide welcome text on mobile header */
-    .header-links a {
-        margin: 0 2px;
-    }
-
-    .main {
-        padding: 15px;
+        padding: 10px;
     }
 
     .container {
@@ -820,9 +898,101 @@ textarea:focus {
         margin-bottom: 10px;
     }
 
+    .header h1 {
+        font-size: 1.5rem;
+    }
+
+    .header-links {
+        font-size: var(--font-size-xs);
+        right: 15px;
+    }
+
+    .header-links span,
+    .header-links a {
+        margin: 0 4px;
+    }
+
+    .chat-header-info {
+        left: 15px;
+        font-size: var(--font-size-xs);
+    }
+
+    .main {
+        padding: 20px;
+    }
+
+    .chat-container {
+        height: calc(100vh - 40px);
+    }
+
+    #chat-flash-messages {
+        width: 90%;
+        bottom: 70px;
+    }
+
+    .admin-container {
+        max-width: 100%;
+    }
+
+    .user-table th,
+    .user-table td {
+        padding: 8px 10px;
+        font-size: var(--font-size-xs);
+    }
+
+    .message-item {
+        max-width: 85%;
+    }
+
+    /* Adjust max width */
+}
+
+@media (max-width: 480px) {
+    html {
+        font-size: 15px;
+    }
+
+    /* Slightly smaller base */
+    .header h1 {
+        font-size: 1.3rem;
+    }
+
+    .header {
+        padding: 15px 20px;
+    }
+
+    .header-links {
+        font-size: 0.7rem;
+    }
+
+    /* Even smaller */
+    .header-links span {
+        display: none;
+    }
+
+    /* Hide welcome on smallest */
+    .chat-header-info {
+        display: none;
+    }
+
+    /* Hide count/etc on smallest header */
+    .main {
+        padding: 15px;
+    }
+
+    .auth-container .main,
+    .admin-container .main {
+        padding: 20px;
+    }
+
+    /* Less padding on small */
+    .container {
+        border-radius: 6px;
+    }
+
+    /* Slightly smaller radius */
     .chat-container .main {
-        padding: 15px 10px 5px 10px;
-        /* Reduce padding further */
+        padding: 15px 10px 10px 10px;
     }
 
     .btn {
@@ -836,21 +1006,36 @@ textarea:focus {
 
     .message-bubble {
         padding: 8px 12px;
+        border-radius: 15px;
     }
 
     .message-item {
         max-width: 90%;
-        /* Allow slightly wider messages */
+    }
+
+    .message-sender {
+        font-size: 0.75rem;
+    }
+
+    .message-timestamp {
+        font-size: 0.65rem;
+    }
+
+    .system-message {
+        font-size: 0.75rem;
+        padding: 8px 10px;
     }
 
     .send_message textarea {
         padding: 8px 12px;
         max-height: 80px;
+        font-size: 0.95rem;
+        border-radius: 18px;
     }
 
     .send_message button {
-        width: 36px;
-        height: 36px;
+        width: 38px;
+        height: 38px;
     }
 
     .send_message button svg {
@@ -859,20 +1044,21 @@ textarea:focus {
     }
 
     #chat-flash-messages {
-        bottom: 60px;
-        /* Adjust based on smaller send bar */
+        bottom: 65px;
     }
 
+    /* Adjust */
     .user-table th,
     .user-table td {
-        font-size: 0.85em;
-        /* Even smaller font for table */
-        padding: 4px 6px;
+        font-size: 0.8rem;
+        padding: 6px 8px;
     }
 
-    .user-table .actions .btn-danger {
-        font-size: 0.75em;
-        padding: 3px 6px;
+    .user-table .actions .btn-danger,
+    .user-table .actions .btn-secondary {
+        font-size: 0.7rem;
+        padding: 4px 8px;
     }
-
 }
+
+/* --- END OF FILE style.css --- */

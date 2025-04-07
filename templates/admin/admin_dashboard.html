@@ -7,14 +7,18 @@
     <title>Admin Dashboard - Chat App</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
+    <!-- Google Fonts (Optional) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container admin-container"> <!-- Use admin container style -->
+    <div class="container admin-container"> <!-- Use wider admin container style -->
         <div class="header">
             <h1>Admin Dashboard</h1>
             <div class="header-links">
-                <span>Welcome, Admin {{ username }}!</span> |
-                <a href="{{ url_for('dashboard') }}">Main Dashboard</a> |
+                <span>Admin: {{ username | e }}</span> |
+                <a href="{{ url_for('dashboard') }}" title="Go to Main User Dashboard">Main Dashboard</a> |
                 <a href="{{ url_for('logout') }}">Logout</a>
             </div>
         </div>
@@ -22,19 +26,22 @@
             <!-- Flash Messages -->
             {% include 'includes/_flash_messages.html' %}
 
-            <h2>Admin Area</h2>
-            <p>Welcome to the administration panel.</p>
+            <h2>Administration Panel</h2>
+            <p>Welcome to the admin area. Use the links below to manage the application.</p>
 
             <div class="admin-nav section-box">
                  <a href="{{ url_for('admin_users') }}" class="btn btn-primary">Manage Users</a>
-                 <!-- Add links to other admin sections here (e.g., Manage Rooms, View Logs) -->
+                 <!-- Future Admin Links Placeholder -->
+                 {# <a href="#" class="btn btn-secondary disabled">Manage Rooms (Future)</a> #}
+                 {# <a href="#" class="btn btn-secondary disabled">View Logs (Future)</a> #}
             </div>
 
-            <!-- Add more admin dashboard content here if needed -->
              <div class="section-box">
-                <h3>Quick Stats (Example)</h3>
-                <p>Total Users: [Placeholder]</p>
-                <p>Active Rooms: [Placeholder]</p>
+                <h3>Application Stats</h3>
+                {# Display stats passed from the route #}
+                <p><strong>Total Registered Users:</strong> {{ user_count if user_count is not none else 'N/A' }}</p>
+                <p><strong>Currently Active Rooms (in memory):</strong> {{ active_room_count if active_room_count is not none else 'N/A' }}</p>
+                {# Add more stats here if needed - e.g., message count #}
             </div>
 
         </div>
