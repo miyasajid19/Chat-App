@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Chat App</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
+</head>
+<body>
+    <div class="container auth-container">
+        <div class="header">
+            <h1>Chat App</h1>
+        </div>
+        <div class="main">
+             <!-- Flash Messages -->
+            {% include 'includes/_flash_messages.html' %}
+
+            <form action="{{ url_for('register') }}" method="post" class="auth-form">
+                <h2>Create Account</h2>
+                <div class="form-group">
+                     <label for="name" class="sr-only">Username:</label>
+                    <input id="name" name="name" type="text" placeholder="Username" required value="{{ request.form.name or '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="email" class="sr-only">Email:</label>
+                    <input id="email" name="email" type="email" placeholder="Email Address" required value="{{ request.form.email or '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="password" class="sr-only">Password:</label>
+                    <input id="password" name="password" type="password" placeholder="Password (min. 6 characters)" required minlength="6">
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary btn-block">Register</button>
+                </div>
+                <p class="or-separator"><span>or</span></p>
+                 <div class="form-group">
+                    <a href="{{ url_for('home') }}" class="btn btn-secondary btn-block">Log In (Existing Account)</a>
+                 </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

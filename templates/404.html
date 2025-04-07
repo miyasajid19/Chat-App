@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 Not Found - Chat App</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
+</head>
+<body>
+    <div class="container error-container">
+        <div class="header"><h1>404 - Page Not Found</h1></div>
+        <div class="main">
+            <p>Oops! The page you are looking for doesn't seem to exist.</p>
+            <p>It might have been moved, deleted, or maybe you typed the address incorrectly.</p>
+            <div class="error-actions">
+                <a href="{{ url_for('home') }}" class="btn btn-primary">Go to Homepage</a>
+                {% if 'user_id' in session %}
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Go to Dashboard</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+     <style> .error-container { max-width: 500px; text-align: center;} .error-actions { margin-top: 25px;} </style>
+</body>
+</html>
