@@ -51,6 +51,7 @@ body {
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
     overflow: hidden;
+    /* Keep overflow hidden for general containers */
 }
 
 .auth-container {
@@ -58,8 +59,26 @@ body {
     /* Specific width for auth forms */
 }
 
-/* Dashboard and Error containers defined in their respective HTML files */
-/* Chat container defined in chatroom/public_chat HTML files */
+.error-container {
+    max-width: 500px;
+    text-align: center;
+}
+
+.dashboard-container {
+    max-width: 500px;
+}
+
+.chat-container {
+    max-width: 700px;
+    height: 90vh;
+    /* Use viewport height */
+    min-height: 400px;
+    /* Minimum height */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* Prevent container itself from scrolling */
+}
 
 
 /* --- Header Styles --- */
@@ -70,6 +89,8 @@ body {
     text-align: center;
     position: relative;
     /* For absolute positioned links */
+    flex-shrink: 0;
+    /* Prevent header shrinking */
 }
 
 .header h1 {
@@ -79,11 +100,54 @@ body {
     font-weight: 500;
 }
 
+.header-links {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    font-size: 0.9em;
+}
+
+.header-links span {
+    margin-right: 5px;
+}
+
+.header-links a {
+    color: white;
+    text-decoration: none;
+}
+
+.header-links a:hover {
+    text-decoration: underline;
+}
+
 
 /* --- Main Content Area --- */
 .main {
     padding: 25px;
+    flex-grow: 1;
+    /* Allow main content to grow */
+    display: flex;
+    /* Use flex for chat layout */
+    flex-direction: column;
+    overflow: hidden;
+    /* Hide overflow for main chat area */
 }
+
+.error-container .main {
+    display: block;
+    /* Override flex for simple error pages */
+}
+
+.dashboard-container .main {
+    display: block;
+    /* Override flex for dashboard layout */
+}
+
+.auth-container .main {
+    display: block;
+    /* Override flex for auth layout */
+}
+
 
 /* --- Form Styles --- */
 .auth-form h2,
@@ -237,6 +301,12 @@ textarea:focus {
     z-index: 0;
 }
 
+/* Specific background for separator in dashboard sections */
+.dashboard-container .or-separator span {
+    background: var(--light-color);
+    /* Use light color for section box background */
+}
+
 /* --- Flash Messages --- */
 /* Placed in includes/_flash_messages.html */
 .flash-messages {
@@ -263,7 +333,9 @@ textarea:focus {
     border-color: #c3e6cb;
 }
 
-.alert-error {
+.alert-error,
+.alert-danger {
+    /* Allow 'danger' category too */
     color: #721c24;
     background-color: #f8d7da;
     border-color: #f5c6cb;
@@ -294,6 +366,310 @@ textarea:focus {
     border: 0;
 }
 
+/* --- Styles for Error Pages --- */
+.error-actions {
+    margin-top: 25px;
+}
+
+/* --- Styles for Dashboard --- */
+.dashboard-container .main h2,
+.dashboard-container .main h3 {
+    text-align: center;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.dashboard-container .main h3 {
+    margin-top: 20px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 8px;
+    font-weight: 600;
+}
+
+.section-box {
+    background-color: var(--light-color);
+    padding: 20px;
+    border-radius: var(--border-radius);
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.room-form,
+.public-chat-link {
+    margin-bottom: 20px;
+}
+
+/* Note: or-separator span background handled above */
+.divider {
+    border: 0;
+    height: 1px;
+    background: #ddd;
+    margin: 30px 0;
+}
+
+.public-chat-link p {
+    color: #666;
+    font-size: 0.95em;
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+/* --- Styles for Chat Interfaces --- */
+.chat-container .main {
+    padding-bottom: 10px;
+    /* Reduce bottom padding */
+}
+
+.room-code-display {
+    font-size: 0.9em;
+    color: var(--muted-color);
+    margin-bottom: 10px;
+    text-align: center;
+    font-weight: normal;
+    padding: 5px;
+    background-color: #eee;
+    border-radius: 4px;
+    flex-shrink: 0;
+    /* Prevent shrinking */
+}
+
+.room-code-display .code {
+    font-weight: bold;
+    color: #333;
+}
+
+.messages {
+    flex-grow: 1;
+    /* Take available space */
+    overflow-y: auto;
+    /* Allow vertical scrolling */
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 15px;
+    background-color: var(--container-bg);
+    margin-bottom: 15px;
+    scroll-behavior: smooth;
+}
+
+#chat-flash-messages {
+    /* Positioned absolutely relative to .chat-container or .main? Let's try relative to .chat-container */
+    position: absolute;
+    bottom: 70px;
+    /* Adjust based on send_message height */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    max-width: 500px;
+    z-index: 100;
+    pointer-events: none;
+    /* Allow clicks through */
+}
+
+#chat-flash-messages .alert {
+    padding: 8px 12px;
+    margin-bottom: 5px;
+    border-radius: 5px;
+    font-size: 0.85em;
+    text-align: center;
+    opacity: 1;
+    transition: opacity 0.5s ease-out;
+    pointer-events: auto;
+    /* Make alerts clickable if needed */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.message-item {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 12px;
+    max-width: 85%;
+}
+
+.sent-message {
+    align-items: flex-end;
+    margin-left: auto;
+}
+
+.received-message {
+    align-items: flex-start;
+    margin-right: auto;
+}
+
+.message-bubble {
+    padding: 10px 15px;
+    border-radius: 18px;
+    word-wrap: break-word;
+    max-width: 100%;
+    position: relative;
+    /* For potential future pseudo-elements */
+}
+
+.sent-message .message-bubble {
+    background-color: var(--primary-color);
+    color: white;
+    border-bottom-right-radius: 5px;
+}
+
+.received-message .message-bubble {
+    background-color: #e9ecef;
+    color: var(--dark-color);
+    border-bottom-left-radius: 5px;
+}
+
+.message-sender {
+    font-weight: bold;
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.85em;
+}
+
+.received-message .message-sender {
+    color: var(--primary-color);
+    /* Make sender name stand out */
+}
+
+.sent-message .message-sender {
+    display: none;
+    /* Hide sender for own messages */
+}
+
+.message-content {
+    line-height: 1.4;
+}
+
+.message-timestamp {
+    font-size: 0.7em;
+    color: var(--muted-color);
+    margin-top: 4px;
+    padding: 0 5px;
+}
+
+.sent-message .message-timestamp {
+    align-self: flex-end;
+}
+
+.received-message .message-timestamp {
+    align-self: flex-start;
+}
+
+.system-message {
+    color: var(--muted-color);
+    font-style: italic;
+    font-size: 0.85em;
+    text-align: center;
+    width: 100%;
+    padding: 8px 0;
+    align-self: center;
+    max-width: 100%;
+    /* Ensure it doesn't overflow */
+    /* Override bubble styles */
+    background-color: transparent;
+    border-radius: 0;
+}
+
+.system-message .message-bubble {
+    padding: 0;
+    background-color: transparent;
+}
+
+.system-message .message-timestamp {
+    display: none;
+    /* Hide timestamp for system messages */
+}
+
+.system-message .message-content {
+    /* Directly style the content */
+    padding: 8px 0;
+}
+
+
+.status-indicator {
+    font-weight: bold;
+    background-color: var(--light-color);
+    border-radius: 5px;
+    margin: 10px;
+    padding: 10px;
+    /* Inherit system-message styles */
+    color: var(--muted-color);
+    font-style: italic;
+    font-size: 0.85em;
+    text-align: center;
+    width: auto;
+    /* Fit content */
+    display: inline-block;
+    /* Center block */
+    align-self: center;
+    max-width: 90%;
+}
+
+.send_message {
+    display: flex;
+    align-items: flex-end;
+    /* Align items to bottom */
+    padding: 5px 0;
+    /* Adjust padding */
+    gap: 10px;
+    flex-shrink: 0;
+    /* Prevent shrinking */
+}
+
+.send_message textarea {
+    flex-grow: 1;
+    padding: 10px 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    /* Rounded corners */
+    resize: none;
+    /* Disable manual resize */
+    font-size: 1em;
+    line-height: 1.4;
+    max-height: 100px;
+    /* Limit max height */
+    overflow-y: auto;
+    /* Scroll if content exceeds max-height */
+    box-sizing: border-box;
+    transition: border-color 0.2s ease;
+}
+
+.send_message textarea:focus {
+    border-color: var(--primary-color);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.send_message button {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    /* Circular button */
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    /* Prevent shrinking */
+}
+
+.send_message button:hover {
+    background-color: #0056b3;
+}
+
+.send_message button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+.send_message button svg {
+    width: 18px;
+    height: 18px;
+}
+
+
 /* --- Responsive Adjustments --- */
 @media (max-width: 768px) {
     .header h1 {
@@ -304,7 +680,14 @@ textarea:focus {
         padding: 20px;
     }
 
-    /* Chat specific adjustments might be needed here or in chat styles */
+    .chat-container {
+        height: 85vh;
+        /* Adjust height slightly */
+    }
+
+    #chat-flash-messages {
+        width: 90%;
+    }
 }
 
 @media (max-width: 480px) {
@@ -317,8 +700,19 @@ textarea:focus {
         font-size: 1.4rem;
     }
 
+    .header-links {
+        font-size: 0.8em;
+        top: 12px;
+        right: 10px;
+    }
+
     .main {
         padding: 15px;
+    }
+
+    .chat-container .main {
+        padding: 15px 10px 5px 10px;
+        /* Reduce padding further */
     }
 
     .btn {
@@ -326,28 +720,31 @@ textarea:focus {
         font-size: 0.95rem;
     }
 
-    /* Further reduce padding/margins if needed */
-}
+    .messages {
+        padding: 10px;
+    }
 
-/* --- Styles for Chat Interfaces --- */
-/* These are duplicated in the <style> blocks of chatroom.html and public_chat.html */
-/* You can keep them here and remove the inline <style> blocks in those files */
-/* OR keep them inline for easier component isolation */
+    .message-bubble {
+        padding: 8px 12px;
+    }
 
-/* Example (if moved here): */
-/*
-.chat-container { max-width: 700px; height: 90vh; display: flex; flex-direction: column; }
-.messages { flex-grow: 1; overflow-y: auto; border: 1px solid #e0e0e0; ... }
-.message-item { display: flex; flex-direction: column; ... }
-.sent-message { align-items: flex-end; margin-left: auto; ... }
-.received-message { align-items: flex-start; margin-right: auto; ... }
-.message-bubble { padding: 10px 15px; border-radius: 18px; ... }
-.sent-message .message-bubble { background-color: var(--primary-color); color: white; ... }
-.received-message .message-bubble { background-color: var(--light-color); color: var(--dark-color); ... }
-.message-sender { font-weight: bold; display: block; ... }
-.message-timestamp { font-size: 0.7em; color: var(--muted-color); ... }
-.system-message { color: var(--muted-color); font-style: italic; ... }
-.send_message { display: flex; align-items: flex-end; ... }
-.send_message textarea { flex-grow: 1; border-radius: 20px; ... }
-.send_message button { width: 40px; height: 40px; border-radius: 50%; ... }
-*/
+    .send_message textarea {
+        padding: 8px 12px;
+        max-height: 80px;
+    }
+
+    .send_message button {
+        width: 36px;
+        height: 36px;
+    }
+
+    .send_message button svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    #chat-flash-messages {
+        bottom: 60px;
+        /* Adjust based on smaller send bar */
+    }
+}   

@@ -1,5 +1,8 @@
+<!-- START OF FILE dashboard.html -->
+
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,14 +10,15 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
 </head>
+
 <body>
     <div class="container dashboard-container">
         <div class="header">
             <h1>Chat Dashboard</h1>
-             <div class="header-links">
+            <div class="header-links">
                 <span>Welcome, {{ username }}!</span> |
                 <a href="{{ url_for('logout') }}">Logout</a>
-             </div>
+            </div>
         </div>
         <div class="main">
             <!-- Flash Messages -->
@@ -22,48 +26,38 @@
 
             <!-- Join/Create Private Room Form -->
             <form action="{{ url_for('join_room_route') }}" method="post" class="room-form section-box">
-                 <h3>Private Rooms</h3>
-                 <div class="form-group">
+                <h3>Private Rooms</h3>
+                <div class="form-group">
                     <label for="room_code" class="sr-only">Room Code to Join:</label>
-                    <input id="room_code" name="room_code" type="text" placeholder="Enter 4-Letter Code to Join" pattern="[A-Za-z]{4}" title="Enter exactly 4 letters">
-                 </div>
-                 <div class="form-group">
-                    <button type="submit" id="join_room" name="join_room" value="true" class="btn btn-secondary btn-block">Join Room</button>
-                 </div>
-                 <p class="or-separator"><span>or</span></p>
-                 <div class="form-group">
-                    <button type="submit" id="create_room" name="create_room" value="true" class="btn btn-primary btn-block">Create New Private Room</button>
-                 </div>
+                    <input id="room_code" name="room_code" type="text" placeholder="Enter 4-Letter Code to Join"
+                        pattern="[A-Za-z]{4}" title="Enter exactly 4 letters" maxlength="4"
+                        style="text-transform:uppercase">
+                </div>
+                <div class="form-group">
+                    <button type="submit" id="join_room" name="join_room" value="true"
+                        class="btn btn-secondary btn-block">Join Room</button>
+                </div>
+                <p class="or-separator"><span>or</span></p>
+                <div class="form-group">
+                    <button type="submit" id="create_room" name="create_room" value="true"
+                        class="btn btn-primary btn-block">Create New Private Room</button>
+                </div>
             </form>
 
-             <hr class="divider">
+            <hr class="divider">
 
             <!-- Link to Public Chat -->
             <div class="public-chat-link section-box">
                 <h3>Public Chat</h3>
                 <p>Join the general chat open to all logged-in users.</p>
-                 <div class="form-group">
+                <div class="form-group">
                     <a href="{{ url_for('public_chat') }}" class="btn btn-success btn-block">Go to Public Chat</a>
-                 </div>
+                </div>
             </div>
 
         </div>
     </div>
-    <!-- Add specific styles for dashboard layout -->
-    <style>
-        .dashboard-container { max-width: 500px; }
-        .header-links { position: absolute; top: 15px; right: 15px; font-size: 0.9em;}
-        .header-links span { margin-right: 5px; }
-        .header-links a { color: white; text-decoration: none; }
-        .header-links a:hover { text-decoration: underline; }
-        .main h2, .main h3 { text-align: center; margin-bottom: 15px; color: #333; }
-        .main h3 { margin-top: 20px; border-bottom: 1px solid #eee; padding-bottom: 8px; font-weight: 600;}
-        .section-box { background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .room-form, .public-chat-link { margin-bottom: 20px; }
-        .or-separator { text-align: center; margin: 20px 0; color: #888; font-size: 0.9em; }
-        .or-separator span { background: #f8f9fa; padding: 0 10px; position: relative; top: -1px;}
-        .divider { border: 0; height: 1px; background: #ddd; margin: 30px 0; }
-        .public-chat-link p { color: #666; font-size: 0.95em; text-align: center; margin-bottom: 15px;}
-    </style>
+    <!-- Removed inline styles -->
 </body>
+
 </html>

@@ -1,3 +1,5 @@
+<!-- START OF FILE public_chat.html -->
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -45,7 +47,7 @@
     <!-- Include Socket.IO Client Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
 
-    <!-- Chat Room JavaScript (Identical logic, includes debug logs, Contains Fix) -->
+    <!-- Chat Room JavaScript (Identical logic as chatroom.html, includes debug logs, Contains Fix) -->
     <script type="text/javascript">
         // --- Configuration ---
         const currentUser = "{{ username }}"; // Username passed from Flask
@@ -73,24 +75,39 @@
         const createMessageElement = (name, msg, timestamp, userId, isSystem = false) => {
             const messageElement = document.createElement("div");
             messageElement.classList.add("message-item");
+            const safeName = sanitize(name), safeMsg = sanitize(msg), formattedTime = formatTimestamp(timestamp);
+
             if (isSystem) {
                 messageElement.classList.add("system-message");
-            } else if (name === currentUser) {
-                messageElement.classList.add("sent-message");
-            } else { messageElement.classList.add("received-message"); }
-            const safeName = sanitize(name), safeMsg = sanitize(msg), formattedTime = formatTimestamp(timestamp);
-            const senderSpan = isSystem ? '' : `<strong class="message-sender">${safeName}</strong>`;
-            messageElement.innerHTML = `<div class="message-bubble">${senderSpan}<span class="message-content">${safeMsg}</span></div><span class="message-timestamp">${formattedTime}</span>`;
+                messageElement.innerHTML = `<span class="message-content">${safeMsg}</span>`;
+            } else {
+                if (name === currentUser) {
+                    messageElement.classList.add("sent-message");
+                } else {
+                    messageElement.classList.add("received-message");
+                }
+                const senderSpan = `<strong class="message-sender">${safeName}</strong>`;
+                messageElement.innerHTML = `<div class="message-bubble">${senderSpan}<span class="message-content">${safeMsg}</span></div><span class="message-timestamp">${formattedTime}</span>`;
+            }
+
             messageContainer.appendChild(messageElement);
             scrollToBottom();
         };
         const scrollToBottom = () => {
-            const shouldScroll = messageContainer.scrollHeight - messageContainer.scrollTop - messageContainer.clientHeight < 150;
-            if (shouldScroll) { messageContainer.scrollTop = messageContainer.scrollHeight; }
+            const isScrolledToBottom = messageContainer.scrollHeight - messageContainer.clientHeight <= messageContainer.scrollTop + 100;
+            if (isScrolledToBottom) {
+                messageContainer.scrollTop = messageContainer.scrollHeight;
+            }
         };
         const showFlashMessage = (message, category = 'info') => {
-            const flashElement = document.createElement('div'); flashElement.className = `alert alert-${category}`; flashElement.textContent = message; flashContainer.appendChild(flashElement);
-            setTimeout(() => { flashElement.style.opacity = '0'; setTimeout(() => flashElement.remove(), 500); }, 4000);
+            const flashElement = document.createElement('div');
+            const alertCategory = (category === 'error') ? 'danger' : category;
+            flashElement.className = `alert alert-${alertCategory}`;
+            flashElement.textContent = message; flashContainer.appendChild(flashElement);
+            setTimeout(() => {
+                flashElement.style.opacity = '0';
+                setTimeout(() => flashElement.remove(), 600);
+            }, 4000);
         };
         const setInputState = (enabled) => {
             console.log("Setting input state to:", enabled); // DEBUG LOG
@@ -98,7 +115,11 @@
             if (enabled) { messageInput.focus(); }
         };
         const showStatusMessage = (message) => {
-            messageContainer.innerHTML = `<div class="system-message status-indicator">${sanitize(message)}</div>`;
+            messageContainer.innerHTML = '';
+            const statusElement = document.createElement('div');
+            statusElement.className = "system-message status-indicator";
+            statusElement.innerHTML = `<span class="message-content">${sanitize(message)}</span>`;
+            messageContainer.appendChild(statusElement);
         };
 
         // --- SocketIO Event Handlers ---
@@ -115,35 +136,34 @@
             console.log("Received message history:", data); // DEBUG LOG
             messageContainer.innerHTML = '';
             if (data && data.messages && data.messages.length > 0) {
-                data.messages.forEach(msg => { createMessageElement(msg.name, msg.message, msg.timestamp, msg.user_id); });
-            } else { createMessageElement("System", "Welcome to the Public Chat!", new Date().toISOString(), null, true); }
+                data.messages.forEach(msg => {
+                    const isSystem = (msg.name === "System");
+                    createMessageElement(msg.name, msg.message, msg.timestamp, msg.user_id, isSystem);
+                });
+            } else {
+                createMessageElement("System", "Welcome to the Public Chat!", new Date().toISOString(), null, true);
+            }
             setInputState(true); // <<<<<< ENABLE INPUT AFTER HISTORY
-            scrollToBottom();
+            messageContainer.scrollTop = messageContainer.scrollHeight; // Scroll down after history
         });
 
-        // --- CORRECTED 'message' HANDLER ---
         socketio.on("message", (data) => {
             console.log("New message received (socketio.on('message')):", data); // DEBUG LOG
 
-            // --- FIX: Check if input is disabled *before* processing ---
             if (messageInput.disabled) {
                 console.log("Input was disabled. Enabling input now."); // DEBUG LOG
                 setInputState(true); // <<<<<< ENABLE INPUT HERE TOO
                 const statusIndicator = messageContainer.querySelector('.status-indicator');
                 if (statusIndicator) { messageContainer.innerHTML = ''; }
             }
-            // --- END FIX ---
 
-            // Now, process the message for display
             if (data && data.message) {
-                const name = data.name || "System";
-                const isSystem = (name === "System");
-                createMessageElement(name, data.message, data.timestamp, data.user_id, isSystem);
+                const isSystem = (data.name === "System");
+                createMessageElement(data.name, data.message, data.timestamp, data.user_id, isSystem);
             } else {
                 console.warn("Received malformed message:", data);
             }
         });
-        // --- END CORRECTED 'message' HANDLER ---
 
         socketio.on("error", (data) => {
             console.error("Server Error (socketio.on('error')):", data.message); // DEBUG LOG
@@ -192,227 +212,13 @@
             console.log("Window loaded. Initializing chat..."); // DEBUG LOG
             setInputState(false); showStatusMessage("Connecting to public chat...");
             console.log(`Public chat room ('${roomCode}') initializing for user:`, currentUser); // DEBUG LOG
+            messageInput.style.height = 'auto';
+            messageInput.style.height = (messageInput.scrollHeight) + 'px';
         };
     </script>
 
-    <!-- Use the SAME Chat Room Specific Styles as chatroom.html -->
-    <style>
-        /* PASTE the entire <style> block from the updated chatroom.html HERE */
-        .chat-container {
-            max-width: 700px;
-            height: 90vh;
-            display: flex;
-            flex-direction: column;
-        }
+    <!-- Public Chat Specific Styles Removed - Moved to style.css -->
 
-        .main {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            padding-bottom: 10px;
-        }
-
-        .header {
-            flex-shrink: 0;
-        }
-
-        .header-links {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-        }
-
-        .header-links a {
-            color: white;
-            text-decoration: none;
-            font-size: 0.9em;
-        }
-
-        .header-links a:hover {
-            text-decoration: underline;
-        }
-
-        /* No room code display needed for public */
-        .messages {
-            flex-grow: 1;
-            overflow-y: auto;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 15px;
-            background-color: #ffffff;
-            margin-bottom: 15px;
-            scroll-behavior: smooth;
-        }
-
-        #chat-flash-messages {
-            position: absolute;
-            bottom: 70px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 80%;
-            max-width: 500px;
-            z-index: 100;
-        }
-
-        #chat-flash-messages .alert {
-            padding: 8px 12px;
-            margin-bottom: 5px;
-            border-radius: 5px;
-            font-size: 0.85em;
-            text-align: center;
-            opacity: 1;
-            transition: opacity 0.5s ease-out;
-        }
-
-        .message-item {
-            display: flex;
-            flex-direction: column;
-            margin-bottom: 12px;
-            max-width: 85%;
-        }
-
-        .sent-message {
-            align-items: flex-end;
-            margin-left: auto;
-        }
-
-        .received-message {
-            align-items: flex-start;
-            margin-right: auto;
-        }
-
-        .message-bubble {
-            padding: 10px 15px;
-            border-radius: 18px;
-            word-wrap: break-word;
-            max-width: 100%;
-            position: relative;
-        }
-
-        .sent-message .message-bubble {
-            background-color: #007bff;
-            color: white;
-            border-bottom-right-radius: 5px;
-        }
-
-        .received-message .message-bubble {
-            background-color: #e9ecef;
-            color: #333;
-            border-bottom-left-radius: 5px;
-        }
-
-        .message-sender {
-            font-weight: bold;
-            display: block;
-            margin-bottom: 4px;
-            font-size: 0.85em;
-        }
-
-        .received-message .message-sender {
-            color: #0056b3;
-        }
-
-        .sent-message .message-sender {
-            display: none;
-        }
-
-        .message-content {
-            line-height: 1.4;
-        }
-
-        .message-timestamp {
-            font-size: 0.7em;
-            color: #999;
-            margin-top: 4px;
-            padding: 0 5px;
-        }
-
-        .sent-message .message-timestamp {
-            align-self: flex-end;
-        }
-
-        .received-message .message-timestamp {
-            align-self: flex-start;
-        }
-
-        .system-message {
-            color: #6c757d;
-            font-style: italic;
-            font-size: 0.85em;
-            text-align: center;
-            width: 100%;
-            padding: 8px 0;
-            align-self: center;
-            max-width: 100%;
-        }
-
-        .status-indicator {
-            font-weight: bold;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            margin: 10px;
-            padding: 10px;
-        }
-
-        .send_message {
-            display: flex;
-            align-items: flex-end;
-            padding: 5px 0;
-            gap: 10px;
-            flex-shrink: 0;
-        }
-
-        .send_message textarea {
-            flex-grow: 1;
-            padding: 10px 15px;
-            border: 1px solid #ccc;
-            border-radius: 20px;
-            resize: none;
-            font-size: 1em;
-            line-height: 1.4;
-            max-height: 100px;
-            overflow-y: auto;
-            box-sizing: border-box;
-            transition: border-color 0.2s ease;
-        }
-
-        .send_message textarea:focus {
-            border-color: #007bff;
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-        }
-
-        .send_message button {
-            width: 40px;
-            height: 40px;
-            padding: 0;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .send_message button:hover {
-            background-color: #0056b3;
-        }
-
-        .send_message button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
-
-        .send_message button svg {
-            width: 18px;
-            height: 18px;
-        }
-    </style>
 </body>
 
 </html>
