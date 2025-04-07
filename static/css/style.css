@@ -38,7 +38,8 @@ body {
     line-height: 1.6;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
+    /* Align top for potential scroll */
     min-height: 100vh;
     padding: 15px;
     /* Add padding for smaller screens */
@@ -52,6 +53,10 @@ body {
     box-shadow: var(--box-shadow);
     overflow: hidden;
     /* Keep overflow hidden for general containers */
+    margin-top: 20px;
+    /* Add some margin from top */
+    margin-bottom: 20px;
+    /* Add margin at bottom */
 }
 
 .auth-container {
@@ -65,7 +70,14 @@ body {
 }
 
 .dashboard-container {
-    max-width: 500px;
+    max-width: 600px;
+    /* Slightly wider for admin link */
+}
+
+.admin-container {
+    /* Style for admin pages */
+    max-width: 900px;
+    /* Wider container for tables */
 }
 
 .chat-container {
@@ -114,6 +126,8 @@ body {
 .header-links a {
     color: white;
     text-decoration: none;
+    margin: 0 3px;
+    /* Spacing between links */
 }
 
 .header-links a:hover {
@@ -133,19 +147,13 @@ body {
     /* Hide overflow for main chat area */
 }
 
-.error-container .main {
+.error-container .main,
+.dashboard-container .main,
+.auth-container .main,
+.admin-container .main {
+    /* Apply block display to these */
     display: block;
-    /* Override flex for simple error pages */
-}
-
-.dashboard-container .main {
-    display: block;
-    /* Override flex for dashboard layout */
-}
-
-.auth-container .main {
-    display: block;
-    /* Override flex for auth layout */
+    /* Override flex for simple layouts */
 }
 
 
@@ -255,7 +263,14 @@ textarea:focus {
     background-color: #218838;
 }
 
-/* Add more button types if needed (danger, warning, info) */
+.btn-danger {
+    background-color: var(--danger-color);
+    color: white;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+}
 
 /* Form Links & Separators */
 .form-links {
@@ -302,7 +317,9 @@ textarea:focus {
 }
 
 /* Specific background for separator in dashboard sections */
-.dashboard-container .or-separator span {
+.dashboard-container .or-separator span,
+.admin-container .or-separator span {
+    /* Added admin */
     background: var(--light-color);
     /* Use light color for section box background */
 }
@@ -335,7 +352,7 @@ textarea:focus {
 
 .alert-error,
 .alert-danger {
-    /* Allow 'danger' category too */
+    /* Combined danger and error */
     color: #721c24;
     background-color: #f8d7da;
     border-color: #f5c6cb;
@@ -371,15 +388,30 @@ textarea:focus {
     margin-top: 25px;
 }
 
-/* --- Styles for Dashboard --- */
+.error-actions .btn {
+    margin-bottom: 10px;
+    /* Space buttons */
+    width: auto;
+    /* Allow buttons to size naturally */
+    display: inline-block;
+    margin-right: 10px;
+}
+
+
+/* --- Styles for Dashboard & Admin --- */
 .dashboard-container .main h2,
-.dashboard-container .main h3 {
+.dashboard-container .main h3,
+.admin-container .main h2,
+.admin-container .main h3 {
+    /* Added admin */
     text-align: center;
     margin-bottom: 15px;
     color: #333;
 }
 
-.dashboard-container .main h3 {
+.dashboard-container .main h3,
+.admin-container .main h3 {
+    /* Added admin */
     margin-top: 20px;
     border-bottom: 1px solid #eee;
     padding-bottom: 8px;
@@ -413,6 +445,62 @@ textarea:focus {
     text-align: center;
     margin-bottom: 15px;
 }
+
+/* Admin Specific Styles */
+.admin-nav {
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.admin-nav .btn {
+    width: auto;
+    /* Let buttons size naturally */
+    margin: 5px 10px;
+}
+
+.user-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.user-table th,
+.user-table td {
+    border: 1px solid var(--border-color);
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: middle;
+    /* Align vertically */
+}
+
+.user-table th {
+    background-color: var(--light-color);
+    font-weight: 600;
+}
+
+.user-table tr:nth-child(even) {
+    background-color: #f8f9fa;
+    /* Slightly different bg for even rows */
+}
+
+.user-table .actions form {
+    display: inline-block;
+    margin: 0 5px 0 0;
+}
+
+.user-table .actions .btn-danger {
+    padding: 4px 8px;
+    font-size: 0.8em;
+    width: auto;
+    /* Override default full width */
+    display: inline-block;
+}
+
+.table-responsive {
+    overflow-x: auto;
+    /* Allow horizontal scroll on small screens */
+}
+
 
 /* --- Styles for Chat Interfaces --- */
 .chat-container .main {
@@ -452,7 +540,6 @@ textarea:focus {
 }
 
 #chat-flash-messages {
-    /* Positioned absolutely relative to .chat-container or .main? Let's try relative to .chat-container */
     position: absolute;
     bottom: 70px;
     /* Adjust based on send_message height */
@@ -562,34 +649,24 @@ textarea:focus {
     align-self: center;
     max-width: 100%;
     /* Ensure it doesn't overflow */
-    /* Override bubble styles */
-    background-color: transparent;
-    border-radius: 0;
-}
-
-.system-message .message-bubble {
-    padding: 0;
-    background-color: transparent;
-}
-
-.system-message .message-timestamp {
-    display: none;
-    /* Hide timestamp for system messages */
+    /* System messages don't use bubbles by default */
 }
 
 .system-message .message-content {
-    /* Directly style the content */
-    padding: 8px 0;
+    padding: 0;
+    /* No extra padding needed */
 }
 
 
 .status-indicator {
+    /* Inherit system-message styles but make it visually distinct */
     font-weight: bold;
-    background-color: var(--light-color);
+    background-color: #f0f0f0;
+    /* Light grey background */
     border-radius: 5px;
-    margin: 10px;
-    padding: 10px;
-    /* Inherit system-message styles */
+    margin: 10px auto;
+    /* Center with auto margins */
+    padding: 10px 15px;
     color: var(--muted-color);
     font-style: italic;
     font-size: 0.85em;
@@ -597,9 +674,12 @@ textarea:focus {
     width: auto;
     /* Fit content */
     display: inline-block;
-    /* Center block */
+    /* Allows centering with text-align on parent or margin:auto */
     align-self: center;
+    /* Center vertically if in flex container */
     max-width: 90%;
+    border: 1px dashed var(--border-color);
+    /* Dashed border */
 }
 
 .send_message {
@@ -672,6 +752,11 @@ textarea:focus {
 
 /* --- Responsive Adjustments --- */
 @media (max-width: 768px) {
+    body {
+        align-items: center;
+        /* Re-center on smaller screens */
+    }
+
     .header h1 {
         font-size: 1.6rem;
     }
@@ -687,6 +772,17 @@ textarea:focus {
 
     #chat-flash-messages {
         width: 90%;
+    }
+
+    .admin-container {
+        max-width: 95%;
+        /* Allow wider admin table */
+    }
+
+    .user-table th,
+    .user-table td {
+        padding: 6px 8px;
+        font-size: 0.9em;
     }
 }
 
@@ -706,8 +802,22 @@ textarea:focus {
         right: 10px;
     }
 
+    .header-links span {
+        display: none;
+    }
+
+    /* Hide welcome text on mobile header */
+    .header-links a {
+        margin: 0 2px;
+    }
+
     .main {
         padding: 15px;
+    }
+
+    .container {
+        margin-top: 10px;
+        margin-bottom: 10px;
     }
 
     .chat-container .main {
@@ -726,6 +836,11 @@ textarea:focus {
 
     .message-bubble {
         padding: 8px 12px;
+    }
+
+    .message-item {
+        max-width: 90%;
+        /* Allow slightly wider messages */
     }
 
     .send_message textarea {
@@ -747,4 +862,17 @@ textarea:focus {
         bottom: 60px;
         /* Adjust based on smaller send bar */
     }
-}   
+
+    .user-table th,
+    .user-table td {
+        font-size: 0.85em;
+        /* Even smaller font for table */
+        padding: 4px 6px;
+    }
+
+    .user-table .actions .btn-danger {
+        font-size: 0.75em;
+        padding: 3px 6px;
+    }
+
+}

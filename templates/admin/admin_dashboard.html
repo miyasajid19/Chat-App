@@ -1,0 +1,44 @@
+<!-- START OF FILE admin/admin_dashboard.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Chat App</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
+</head>
+<body>
+    <div class="container admin-container"> <!-- Use admin container style -->
+        <div class="header">
+            <h1>Admin Dashboard</h1>
+            <div class="header-links">
+                <span>Welcome, Admin {{ username }}!</span> |
+                <a href="{{ url_for('dashboard') }}">Main Dashboard</a> |
+                <a href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </div>
+        <div class="main">
+            <!-- Flash Messages -->
+            {% include 'includes/_flash_messages.html' %}
+
+            <h2>Admin Area</h2>
+            <p>Welcome to the administration panel.</p>
+
+            <div class="admin-nav section-box">
+                 <a href="{{ url_for('admin_users') }}" class="btn btn-primary">Manage Users</a>
+                 <!-- Add links to other admin sections here (e.g., Manage Rooms, View Logs) -->
+            </div>
+
+            <!-- Add more admin dashboard content here if needed -->
+             <div class="section-box">
+                <h3>Quick Stats (Example)</h3>
+                <p>Total Users: [Placeholder]</p>
+                <p>Active Rooms: [Placeholder]</p>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>
+<!-- END OF FILE admin/admin_dashboard.html -->

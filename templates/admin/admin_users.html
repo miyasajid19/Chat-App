@@ -1,0 +1,81 @@
+<!-- START OF FILE admin/admin_users.html -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Users - Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
+</head>
+
+<body>
+    <div class="container admin-container"> <!-- Wider container for table -->
+        <div class="header">
+            <h1>Manage Users</h1>
+            <div class="header-links">
+                <span>Admin: {{ username }}</span> |
+                <a href="{{ url_for('admin_dashboard') }}">Admin Home</a> |
+                <a href="{{ url_for('dashboard') }}">Main Dashboard</a> |
+                <a href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </div>
+        <div class="main">
+            <!-- Flash Messages -->
+            {% include 'includes/_flash_messages.html' %}
+
+            <h2>User List</h2>
+            <p>Manage registered user accounts. You cannot delete your own account or other administrators.</p>
+
+            {% if users %}
+            <div class="table-responsive section-box">
+                <table class="user-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Registered On</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>{{ user.id }}</td>
+                            <td>{{ user.name | e }}</td>
+                            <td>{{ user.email | e }}</td>
+                            <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else 'N/A' }}</td>
+                            <td class="actions">
+                                {# Only allow deleting non-admin users #}
+                                {% if not user.is_admin %}
+                                <form action="{{ url_for('admin_delete_user', user_id=user.id) }}" method="post"
+                                    onsubmit="return confirm('Are you sure you want to PERMANENTLY delete user \'{{ user.name | escape }}\'? This cannot be undone.');">
+                                    <button type="submit" class="btn btn-danger">Delete</button>
+                                </form>
+                                {% else %}
+                                <!-- No actions for other admins -->
+                                <span style="color: var(--muted-color); font-style: italic;">(Admin)</span>
+                                {% endif %}
+                                <!-- Add Update/Edit buttons/links here later -->
+                                {# <a href="{{ url_for('admin_edit_user', user_id=user.id) }}"
+                                    class="btn btn-secondary btn-sm">Edit</a> #}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="section-box">
+                <p>No other users found.</p>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+</body>
+
+</html>
+<!-- END OF FILE admin/admin_users.html -->

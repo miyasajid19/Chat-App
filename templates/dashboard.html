@@ -16,8 +16,12 @@
         <div class="header">
             <h1>Chat Dashboard</h1>
             <div class="header-links">
-                <span>Welcome, {{ username }}!</span> |
-                <a href="{{ url_for('logout') }}">Logout</a>
+                <span>Welcome, {{ username }}!</span>
+                {# Conditionally show Admin Panel link #}
+                {% if is_admin %}
+                | <a href="{{ url_for('admin_dashboard') }}">Admin Panel</a>
+                {% endif %}
+                | <a href="{{ url_for('logout') }}">Logout</a>
             </div>
         </div>
         <div class="main">
@@ -26,23 +30,23 @@
 
             <!-- Join/Create Private Room Form -->
             <form action="{{ url_for('join_room_route') }}" method="post" class="room-form section-box">
-                <h3>Private Rooms</h3>
-                <div class="form-group">
-                    <label for="room_code" class="sr-only">Room Code to Join:</label>
-                    <input id="room_code" name="room_code" type="text" placeholder="Enter 4-Letter Code to Join"
-                        pattern="[A-Za-z]{4}" title="Enter exactly 4 letters" maxlength="4"
-                        style="text-transform:uppercase">
-                </div>
-                <div class="form-group">
-                    <button type="submit" id="join_room" name="join_room" value="true"
-                        class="btn btn-secondary btn-block">Join Room</button>
-                </div>
-                <p class="or-separator"><span>or</span></p>
-                <div class="form-group">
-                    <button type="submit" id="create_room" name="create_room" value="true"
-                        class="btn btn-primary btn-block">Create New Private Room</button>
-                </div>
-            </form>
+                 <h3>Private Rooms</h3>
+                 <div class="form-group">
+                     <label for="room_code" class="sr-only">Room Code to Join:</label>
+                     <input id="room_code" name="room_code" type="text" placeholder="Enter 4-Letter Code to Join"
+                         pattern="[A-Za-z]{4}" title="Enter exactly 4 letters" maxlength="4"
+                         style="text-transform:uppercase">
+                 </div>
+                 <div class="form-group">
+                     <button type="submit" id="join_room" name="join_room" value="true"
+                         class="btn btn-secondary btn-block">Join Room</button>
+                 </div>
+                 <p class="or-separator"><span>or</span></p>
+                 <div class="form-group">
+                     <button type="submit" id="create_room" name="create_room" value="true"
+                         class="btn btn-primary btn-block">Create New Private Room</button>
+                 </div>
+             </form>
 
             <hr class="divider">
 
@@ -57,7 +61,7 @@
 
         </div>
     </div>
-    <!-- Removed inline styles -->
 </body>
 
 </html>
+<!-- END OF FILE dashboard.html -->
