@@ -17,15 +17,17 @@
 
 <body>
     <div class="container chat-container">
-        <div class="header">
-             <div class="chat-header-info">
+        <div class="header" style="border-bottom: 0px;">
+            <h1>Public Chat Room</h1>
+        </div>
+        <div class="header" >
+            <div class="chat-header-info">
                 <!-- User Count Display -->
                 Users Online: <span id="user-count-display" class="user-count-display">?</span>
             </div>
-            <h1>Public Chat Room</h1>
             <div class="header-links">
-                 {# Display username from session passed by Flask #}
-                 <span title="Your Username">You are {{ username | e }}</span> |
+                {# Display username from session passed by Flask #}
+                <span title="Your Username">You are {{ username | e }}</span> |
                 <a href="{{ url_for('dashboard') }}" title="Leave Chat & Go to Dashboard">Dashboard</a>
             </div>
         </div>
@@ -34,26 +36,26 @@
 
             <!-- Messages Area -->
             <div class="messages" id="messages">
-                 <!-- Initial loading/status message -->
+                <!-- Initial loading/status message -->
                 <div class="system-message status-indicator">Connecting to Public Chat...</div>
             </div>
 
             <!-- Floating Flash Messages Area -->
             <div id="chat-flash-messages"></div>
 
-             <!-- Message Input Area -->
-             <form class="send_message" id="message-form">
-                 <label for="message" class="sr-only">Message:</label>
-                 <textarea id="message" name="message" placeholder="Type your message..." aria-label="Type your message"
-                     rows="1" disabled></textarea> {# Start disabled #}
-                 <button type="submit" id="send-btn" aria-label="Send Message" disabled> {# Start disabled #}
-                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                         class="bi bi-send-fill" viewBox="0 0 16 16">
-                         <path
-                             d="M15.964.686a.5.5 0 0 0-.65-.65L.767 5.855H.766l-.452.18a.5.5 0 0 0-.082.887l.41.26.001.002 4.995 3.178 3.178 4.995.002.001.26.41a.5.5 0 0 0 .886-.083l6-15Zm-1.833 1.89L6.637 10.07l-.215-.338a.5.5 0 0 0-.154-.154l-.338-.215 7.494-7.494 1.178-.471-.47 1.178Z" />
-                     </svg>
-                 </button>
-             </form>
+            <!-- Message Input Area -->
+            <form class="send_message" id="message-form">
+                <label for="message" class="sr-only">Message:</label>
+                <textarea id="message" name="message" placeholder="Type your message..." aria-label="Type your message"
+                    rows="1" disabled></textarea> {# Start disabled #}
+                <button type="submit" id="send-btn" aria-label="Send Message" disabled> {# Start disabled #}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                        class="bi bi-send-fill" viewBox="0 0 16 16">
+                        <path
+                            d="M15.964.686a.5.5 0 0 0-.65-.65L.767 5.855H.766l-.452.18a.5.5 0 0 0-.082.887l.41.26.001.002 4.995 3.178 3.178 4.995.002.001.26.41a.5.5 0 0 0 .886-.083l6-15Zm-1.833 1.89L6.637 10.07l-.215-.338a.5.5 0 0 0-.154-.154l-.338-.215 7.494-7.494 1.178-.471-.47 1.178Z" />
+                    </svg>
+                </button>
+            </form>
         </div>
     </div>
 
@@ -118,10 +120,10 @@
             }
             messageContainer.appendChild(messageElement);
         };
-         const scrollToBottom = (force = false) => {
+        const scrollToBottom = (force = false) => {
             const nearBottom = messageContainer.scrollHeight - messageContainer.clientHeight <= messageContainer.scrollTop + 150;
             if (force || nearBottom) {
-                 setTimeout(() => { messageContainer.scrollTop = messageContainer.scrollHeight; }, 50);
+                setTimeout(() => { messageContainer.scrollTop = messageContainer.scrollHeight; }, 50);
             }
         };
         const showFlashMessage = (message, category = 'info') => {
@@ -135,12 +137,12 @@
                 setTimeout(() => flashElement.remove(), 600);
             }, 4000);
         };
-         const setInputState = (enabled) => {
+        const setInputState = (enabled) => {
             messageInput.disabled = !enabled;
             sendButton.disabled = !enabled;
             messageInput.placeholder = enabled ? "Type your message..." : "Connecting...";
             if (enabled) { messageInput.focus(); }
-            if (enabled) { autoResizeTextarea();}
+            if (enabled) { autoResizeTextarea(); }
         };
         const showStatusMessage = (message, isError = false) => {
             messageContainer.innerHTML = '';
@@ -149,15 +151,15 @@
             statusElement.innerHTML = `<span class="message-content">${sanitize(message)}</span>`;
             messageContainer.appendChild(statusElement);
         };
-         const autoResizeTextarea = () => {
-             messageInput.style.height = 'auto';
-             const scrollHeight = messageInput.scrollHeight;
-             const maxHeight = 100;
-             messageInput.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
-         };
+        const autoResizeTextarea = () => {
+            messageInput.style.height = 'auto';
+            const scrollHeight = messageInput.scrollHeight;
+            const maxHeight = 100;
+            messageInput.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+        };
 
         // --- SocketIO Event Handlers (Same as chatroom.html) ---
-         socketio.on("connect", () => {
+        socketio.on("connect", () => {
             console.log("Socket.IO: Connected successfully (SID:", socketio.id, ")");
             setInputState(true);
         });
@@ -183,15 +185,15 @@
             scrollToBottom(true);
         });
         socketio.on("message", (data) => {
-             console.log("Socket.IO: Received public message:", data);
-             if (!messageInput.disabled) {
+            console.log("Socket.IO: Received public message:", data);
+            if (!messageInput.disabled) {
                 if (data && data.message) { createMessageElement(data); scrollToBottom(); }
                 else { console.warn("Received invalid public message format:", data); }
-             }
+            }
         });
         socketio.on("update_user_count", (data) => {
-             console.log("Socket.IO: Update user count:", data);
-             if (data && typeof data.count === 'number') { userCountDisplay.textContent = data.count; }
+            console.log("Socket.IO: Update user count:", data);
+            if (data && typeof data.count === 'number') { userCountDisplay.textContent = data.count; }
         });
         socketio.on("error", (data) => {
             console.error("Socket.IO: Server error received:", data.message);
@@ -199,15 +201,15 @@
         });
 
         // --- Sending Messages (Same as chatroom.html) ---
-         const sendMessage = () => {
+        const sendMessage = () => {
             const message = messageInput.value.trim();
             if (message && !messageInput.disabled) {
                 console.log("Sending public message:", message);
                 socketio.emit("message", { data: message });
                 messageInput.value = ""; autoResizeTextarea(); messageInput.focus();
             } else if (messageInput.disabled) {
-                 console.warn("Attempted to send public message while disconnected.");
-                 showFlashMessage("Cannot send message while disconnected.", "warning");
+                console.warn("Attempted to send public message while disconnected.");
+                showFlashMessage("Cannot send message while disconnected.", "warning");
             }
         };
 
@@ -217,7 +219,7 @@
         messageInput.addEventListener('input', autoResizeTextarea);
 
         // --- Initial Setup ---
-         window.addEventListener('load', () => {
+        window.addEventListener('load', () => {
             console.log(`Public Chat Initializing: User=${currentUser}`);
             autoResizeTextarea();
             // SocketIO connects automatically
