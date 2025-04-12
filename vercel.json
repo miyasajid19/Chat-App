@@ -1,14 +1,16 @@
 {
   "version": 2,
   "builds": [
-    { "src": "app.py", "use": "@vercel/python" }
+    {
+      "src": "app.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxDuration": 30 // Configure maxDuration within the build object
+      }
+    }
   ],
   "routes": [
     { "src": "/(.*)", "dest": "app.py" }
-  ],
-  "functions": {
-    "app.py": {
-      "maxDuration": 30
-    }
-  }
+  ]
+  // No top-level "functions" object here
 }
