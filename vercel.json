@@ -5,12 +5,11 @@
       "src": "app.py",
       "use": "@vercel/python",
       "config": {
-        "maxDuration": 30 // Configure maxDuration within the build object
+        "maxDuration": 30 
       }
     }
   ],
   "routes": [
     { "src": "/(.*)", "dest": "app.py" }
   ]
-  // No top-level "functions" object here
 }
