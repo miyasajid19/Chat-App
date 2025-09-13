@@ -100,6 +100,18 @@ Chat-App/
     └── includes/
         └── _flash_messages.html
 ```
+## Interfaces
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/4568f9ad-11e5-423c-aafe-5aeb4e3a05eb" />
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/e3a06caa-0444-46da-9a9b-12418be670e9" />
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/2a8f62a6-c691-4d34-92e4-4473f7b39f85" />
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/b99eab36-e5c9-4c1c-8ce2-83a7035c09b8" />
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/ff11a8bf-d907-454f-a064-a09d1b08ec3a" />
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/9962d1e5-e7c5-4e04-ab9c-4a87eca2c521" />
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/4f575fa4-2085-42e1-986b-380a2945863a" />
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/619468b5-7756-40ce-b6a7-12b2cf8fe6ab" />
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/26a5bca4-a01e-4d94-9fc5-9e98db1f5f28" />
+<img width="1916" height="1079" alt="image" src="https://github.com/user-attachments/assets/b8418cfa-59aa-4e2b-b1da-70b2cb593cf6" />
+
 
 ## Contributing
 
