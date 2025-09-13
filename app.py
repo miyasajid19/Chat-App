@@ -1,6 +1,16 @@
 # --- START OF FILE app.py ---
 
+# Monkey patch MUST be done at the very beginning, before any other imports
 import os
+ASYNC_MODE = os.getenv('SOCKETIO_ASYNC_MODE', 'eventlet')  # Check env first
+
+if ASYNC_MODE == 'eventlet':
+    import eventlet
+    eventlet.monkey_patch()
+elif ASYNC_MODE == 'gevent':
+    from gevent import monkey
+    monkey.patch_all()
+
 import random
 import string
 import pymysql
@@ -35,32 +45,9 @@ log_format = '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d
 log_level = logging.DEBUG if app.debug else logging.INFO
 logging.basicConfig(level=log_level, format=log_format)
 
-
-# SocketIO Initialization - Specify async_mode
-ASYNC_MODE = os.getenv('SOCKETIO_ASYNC_MODE', 'eventlet') # Default to eventlet
-try:
-    if ASYNC_MODE == 'eventlet':
-        import eventlet
-        eventlet.monkey_patch() # Required for eventlet
-        app.logger.info("Using eventlet async mode.")
-    elif ASYNC_MODE == 'gevent':
-        from gevent import monkey
-        monkey.patch_all() # Required for gevent
-        app.logger.info("Using gevent async mode.")
-    elif ASYNC_MODE == 'gevent_uwsgi':
-         app.logger.info("Using gevent_uwsgi async mode (requires uWSGI with gevent plugin).")
-    else: # Default/Fallback (Werkzeug - Development only!)
-        ASYNC_MODE = None # Let SocketIO choose default (Werkzeug)
-        app.logger.warning("No preferred async mode specified or installed (eventlet/gevent). Falling back to Werkzeug (NOT FOR PRODUCTION).")
-
-    socketio = SocketIO(app, async_mode=ASYNC_MODE, logger=app.logger, engineio_logger=app.logger.getChild('engineio'))
-
-except ImportError as e:
-    app.logger.error(f"Failed to import async mode library '{ASYNC_MODE}': {e}. Install it (`pip install {ASYNC_MODE}`) or choose another.")
-    app.logger.warning("Falling back to Werkzeug async mode (NOT FOR PRODUCTION).")
-    ASYNC_MODE = None
-    socketio = SocketIO(app, async_mode=ASYNC_MODE, logger=app.logger, engineio_logger=app.logger.getChild('engineio'))
-
+# SocketIO Initialization
+socketio = SocketIO(app, async_mode=ASYNC_MODE, logger=app.logger if hasattr(app, 'logger') else None, 
+                    engineio_logger=app.logger.getChild('engineio') if hasattr(app, 'logger') else None)
 
 # Mail Configuration
 app.config.update(
@@ -74,7 +61,7 @@ app.config.update(
 )
 
 if not all([app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'], app.config['MAIL_DEFAULT_SENDER']]):
-    app.logger.warning("Mail configuration missing or incomplete (MAIL_USERNAME, MAIL_PASSWORD, MAIL_DEFAULT_SENDER). Password reset emails will fail.")
+    print("WARNING: Mail configuration missing or incomplete (MAIL_USERNAME, MAIL_PASSWORD, MAIL_DEFAULT_SENDER). Password reset emails will fail.")
 mail = Mail(app)
 
 # Database Configuration from Environment Variables
@@ -93,7 +80,7 @@ DB_CONFIG = {
 }
 
 if not all([DB_CONFIG['host'], DB_CONFIG['user'], DB_CONFIG['password'], DB_CONFIG['database']]):
-     app.logger.critical("FATAL: Database configuration is incomplete. Check DB_HOST, DB_USER, DB_PASSWORD, DB_NAME in .env file.")
+     print("FATAL: Database configuration is incomplete. Check DB_HOST, DB_USER, DB_PASSWORD, DB_NAME in .env file.")
      raise ValueError("Database configuration is incomplete. Check .env file.")
 
 # Database Connection Management
@@ -102,9 +89,9 @@ def get_db():
     if 'db' not in g or not g.db.open:
         try:
             g.db = pymysql.connect(**DB_CONFIG)
-            app.logger.debug("Database connection established.")
+            print("Database connection established.")
         except pymysql.MySQLError as e:
-            app.logger.error(f"Database connection failed: {e}")
+            print(f"Database connection failed: {e}")
             raise ConnectionError(f"Could not connect to the database: {e}") from e
     return g.db
 
@@ -115,19 +102,19 @@ def close_db(error=None):
     if db is not None and db.open:
         try:
             db.close()
-            app.logger.debug("Database connection closed.")
+            print("Database connection closed.")
         except pymysql.MySQLError as e:
-            app.logger.error(f"Error closing database connection: {e}")
+            print(f"Error closing database connection: {e}")
     elif db is not None:
-         app.logger.debug("Database connection was already closed or not open at teardown.")
+         print("Database connection was already closed or not open at teardown.")
 
     if error: # Log any exceptions that caused the teardown
-        app.logger.error(f"App Context teardown due to error: {error}", exc_info=app.debug) # Log traceback if debug
+        print(f"App Context teardown due to error: {error}")
 
 
 def initialize_database():
     """Checks if the database and required tables exist, creating them if necessary."""
-    app.logger.info("Starting database initialization check...")
+    print("Starting database initialization check...")
     try:
         # Connect without specifying database initially to create it if needed
         conn = pymysql.connect(host=DB_CONFIG['host'], user=DB_CONFIG['user'], password=DB_CONFIG['password'], port=DB_CONFIG['port'], charset=DB_CONFIG['charset'])
@@ -135,7 +122,7 @@ def initialize_database():
         db_name = DB_CONFIG['database']
         cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
         cursor.execute(f"USE `{db_name}`;")
-        app.logger.info(f"Ensured database '{db_name}' exists.")
+        print(f"Ensured database '{db_name}' exists.")
 
         # Create users table with is_admin column
         cursor.execute("""
@@ -148,15 +135,15 @@ def initialize_database():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'User registration timestamp'
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Stores user account information';
         """)
-        app.logger.info("Checked/Created 'users' table.")
+        print("Checked/Created 'users' table.")
 
         # Ensure is_admin column exists if table already existed (idempotent)
         try:
             cursor.execute("SELECT is_admin FROM users LIMIT 1;")
-            app.logger.debug("'is_admin' column already exists in users table.")
+            print("'is_admin' column already exists in users table.")
         except pymysql.err.OperationalError as e:
              if "Unknown column 'is_admin'" in str(e):
-                 app.logger.info("Adding missing 'is_admin' column to existing 'users' table.")
+                 print("Adding missing 'is_admin' column to existing 'users' table.")
                  cursor.execute("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE NOT NULL COMMENT 'Flag indicating admin privileges';")
              else:
                   raise # Re-raise other operational errors
@@ -173,7 +160,7 @@ def initialize_database():
             INDEX room_time_idx (room_code, timestamp) COMMENT 'Index for efficient history fetching per room'
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Stores chat messages for all rooms';
         """)
-        app.logger.info("Checked/Created 'messages' table.")
+        print("Checked/Created 'messages' table.")
 
         # Add foreign key constraint for messages table (idempotent check)
         try:
@@ -186,18 +173,18 @@ def initialize_database():
             if not fk_exists:
                 cursor.execute("""ALTER TABLE messages ADD CONSTRAINT fk_user_id FOREIGN KEY (user_id)
                                REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE;""")
-                app.logger.info("Added foreign key constraint messages.user_id -> users.id (ON DELETE SET NULL).")
+                print("Added foreign key constraint messages.user_id -> users.id (ON DELETE SET NULL).")
             else:
-                 app.logger.debug("Foreign key constraint 'fk_user_id' already exists on messages table.")
+                 print("Foreign key constraint 'fk_user_id' already exists on messages table.")
 
         except pymysql.MySQLError as fk_error:
-             app.logger.warning(f"Could not add/verify foreign key constraint (may already exist or DB issue): {fk_error}")
+             print(f"Could not add/verify foreign key constraint (may already exist or DB issue): {fk_error}")
 
         conn.commit() # Commit schema changes
-        app.logger.info("Database schema initialization complete.")
+        print("Database schema initialization complete.")
 
     except pymysql.MySQLError as e:
-        app.logger.critical(f"FATAL: Database schema could not be initialized: {e}", exc_info=True)
+        print(f"FATAL: Database schema could not be initialized: {e}")
         raise RuntimeError(f"FATAL: Database schema could not be initialized: {e}") from e
     finally:
         if 'cursor' in locals() and cursor: cursor.close()
@@ -212,7 +199,7 @@ def ensure_admin_user():
     admin_pass = "407432"
     admin_name = "SMPK Admin"
 
-    app.logger.info(f"Ensuring admin user '{admin_email}' exists and is configured...")
+    print(f"Ensuring admin user '{admin_email}' exists and is configured...")
     try:
         with app.app_context():
             conn = get_db()
@@ -228,7 +215,7 @@ def ensure_admin_user():
                         "INSERT INTO users (name, email, password, is_admin) VALUES (%s, %s, %s, TRUE)",
                         (admin_name, admin_email, hashed_pass)
                     )
-                    app.logger.info(f"Created admin user '{admin_email}' with the specified password.")
+                    print(f"Created admin user '{admin_email}' with the specified password.")
                 else:
                     needs_update = False
                     update_sql = "UPDATE users SET"
@@ -236,11 +223,11 @@ def ensure_admin_user():
                     if not check_password_hash(admin_user['password'], admin_pass):
                         update_sql += " password = %s,"
                         update_params.append(hashed_pass)
-                        app.logger.info(f"Updating password for admin user '{admin_email}'.")
+                        print(f"Updating password for admin user '{admin_email}'.")
                         needs_update = True
                     if not admin_user['is_admin']:
                         update_sql += " is_admin = TRUE,"
-                        app.logger.info(f"Setting admin status for user '{admin_email}'.")
+                        print(f"Setting admin status for user '{admin_email}'.")
                         needs_update = True
 
                     if needs_update:
@@ -249,16 +236,16 @@ def ensure_admin_user():
                         update_params.append(admin_user['id'])
                         cursor.execute(update_sql, tuple(update_params))
                     else:
-                        app.logger.info(f"Admin user '{admin_email}' already exists and is correctly configured.")
+                        print(f"Admin user '{admin_email}' already exists and is correctly configured.")
 
             except pymysql.MySQLError as e:
-                app.logger.error(f"Database error while ensuring admin user '{admin_email}': {e}", exc_info=True)
+                print(f"Database error while ensuring admin user '{admin_email}': {e}")
             finally:
                  if cursor: cursor.close()
                  # Connection closed by teardown_appcontext
 
     except Exception as e:
-         app.logger.error(f"Failed to run ensure_admin_user within app context: {e}", exc_info=True)
+         print(f"Failed to run ensure_admin_user within app context: {e}")
 
 
 # Initialize DB and Admin User on startup
@@ -270,12 +257,11 @@ except (RuntimeError, ConnectionError) as e:
      sys.exit(1)
 
 
-# In-memory room tracker: {'ROOMCODE': {'members': count, 'sids': {sid1, sid2,...}}}
+# In-memory room tracker: {'ROOMCODE': {'members': count, 'users': {user_id1, user_id2,...}}}
 rooms = {}
-# Simple SID to username mapping (primarily for disconnect message)
+# Simple SID mappings (primarily for disconnect handling)
 # Caution: Only holds users *currently* connected via SocketIO
-# Might be incomplete if session/socket relationship gets complex
-sid_to_user = {}
+sid_to_info = {}
 
 # --- Utility Functions ---
 def generate_room_code(length=4):
@@ -712,7 +698,7 @@ def join_room_route():
     elif create_room_action:
         new_code = generate_room_code()
         # Initialize room tracker immediately on creation
-        rooms[new_code] = {"members": 0, "sids": set()}
+        rooms[new_code] = {"members": 0, "users": set()}
         target_room_code = new_code
         app.logger.info(f"User '{name}' (ID: {user_id}) created new private room '{target_room_code}'.")
         # Optional: Save a "Room Created" system message to DB?
@@ -771,7 +757,7 @@ def public_chat():
 
     # Ensure PUBLIC room tracker exists in memory
     if "PUBLIC" not in rooms:
-        rooms["PUBLIC"] = {"members": 0, "sids": set()}
+        rooms["PUBLIC"] = {"members": 0, "users": set()}
         app.logger.info("Initialized PUBLIC room tracker in memory.")
 
     app.logger.info(f"User '{user_name}' entering public chat (room 'PUBLIC').")
@@ -882,6 +868,128 @@ def admin_delete_user(user_id):
     # No matter what, redirect back
     return redirect(url_for('admin_users'))
 
+def get_all_rooms():
+    """Gets all rooms with their status and message counts."""
+    rooms_list = []
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Get message counts for all room_codes
+        cursor.execute("""
+            SELECT room_code, COUNT(*) as message_count
+            FROM messages
+            GROUP BY room_code
+        """)
+        message_counts = {row['room_code']: row['message_count'] for row in cursor.fetchall()}
+        
+        # Active rooms
+        for room_code, data in rooms.items():
+            rooms_list.append({
+                'code': room_code,
+                'is_active': True,
+                'members': data['members'],
+                'message_count': message_counts.get(room_code, 0)
+            })
+        
+        # Historical rooms (in DB but not active)
+        for room_code in message_counts:
+            if room_code not in rooms:
+                rooms_list.append({
+                    'code': room_code,
+                    'is_active': False,
+                    'members': 0,
+                    'message_count': message_counts[room_code]
+                })
+        
+        cursor.close()
+    except Exception as e:
+        app.logger.error(f"Error getting all rooms: {e}")
+    
+    return rooms_list
+
+@app.route('/admin/rooms')
+@admin_required
+def admin_rooms():
+    """Displays a list of all rooms for management."""
+    rooms_list = get_all_rooms()
+    return render_template('admin/admin_rooms.html',
+                           rooms=rooms_list,
+                           username=session.get('name'))
+
+@app.route('/admin/room/<room_code>')
+@admin_required
+def admin_room_details(room_code):
+    """Displays details and messages for a specific room."""
+    # Validate room exists
+    if not is_valid_room(room_code):
+        flash(f"Room '{room_code}' does not exist.", "error")
+        return redirect(url_for('admin_rooms'))
+    
+    # Get messages
+    messages = get_message_history(room_code, limit=100)  # More for admin view
+    
+    return render_template('admin/admin_room_details.html',
+                           room_code=room_code,
+                           messages=messages,
+                           username=session.get('name'))
+
+@app.route('/admin/room/<room_code>/clear_messages', methods=['POST'])
+@admin_required
+def admin_clear_room_messages(room_code):
+    """Clears all messages for a specific room."""
+    if not is_valid_room(room_code):
+        flash(f"Room '{room_code}' does not exist.", "error")
+        return redirect(url_for('admin_rooms'))
+    
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM messages WHERE room_code = %s", (room_code,))
+        deleted_count = cursor.rowcount
+        cursor.close()
+        
+        flash(f"Cleared {deleted_count} messages from room '{room_code}'.", "success")
+        app.logger.info(f"Admin {session.get('name')} cleared {deleted_count} messages from room '{room_code}'.")
+    except Exception as e:
+        app.logger.error(f"Error clearing messages for room {room_code}: {e}")
+        flash("Could not clear messages due to a database error.", "error")
+    
+    return redirect(url_for('admin_rooms'))
+
+@app.route('/admin/room/<room_code>/delete', methods=['POST'])
+@admin_required
+def admin_delete_room(room_code):
+    """Deletes a room entirely (removes from memory and DB)."""
+    if not is_valid_room(room_code):
+        flash(f"Room '{room_code}' does not exist.", "error")
+        return redirect(url_for('admin_rooms'))
+    
+    try:
+        # Remove from memory if active
+        if room_code in rooms:
+            # Disconnect all users in the room
+            for sid, info in list(sid_to_info.items()):
+                if info['room_code'] == room_code:
+                    socketio.emit('error', {'message': 'Room has been deleted by admin.'}, room=sid)
+                    disconnect(sid)
+            del rooms[room_code]
+        
+        # Delete all messages
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM messages WHERE room_code = %s", (room_code,))
+        deleted_count = cursor.rowcount
+        cursor.close()
+        
+        flash(f"Room '{room_code}' has been deleted. Removed {deleted_count} messages.", "success")
+        app.logger.info(f"Admin {session.get('name')} deleted room '{room_code}' and {deleted_count} messages.")
+    except Exception as e:
+        app.logger.error(f"Error deleting room {room_code}: {e}")
+        flash("Could not delete room due to a database error.", "error")
+    
+    return redirect(url_for('admin_rooms'))
+
 # Potential future admin action stub
 # @app.route('/admin/user/<int:user_id>/edit', methods=['GET', 'POST'])
 # @admin_required
@@ -923,7 +1031,7 @@ def get_message_history(room_code, limit=75): # Increased limit slightly
                  "message": msg['content'],
                  "timestamp": ts_aware_utc.isoformat(), # Send ISO string to client
                  "user_id": msg['user_id'],
-                 "isSystem": False # Currently, only user messages are stored
+                 "isSystem": msg['user_id'] is None # System messages have NULL user_id
              })
         app.logger.debug(f"Formatted {len(messages)} history messages for room '{room_code}' for client.")
 
@@ -942,27 +1050,31 @@ def save_message(room_code, user_id, user_name, content):
     """Saves a chat message to the database."""
     app.logger.debug(f"Attempting to save message to room '{room_code}' by User: {user_name} (ID: {user_id})")
     success = False
+    conn = None
+    cursor = None
     try:
-        conn = get_db()
+        conn = pymysql.connect(**DB_CONFIG)
         cursor = conn.cursor()
-        # Use UTC timestamp directly
         utc_now = datetime.datetime.now(pytz.utc)
         query = """
             INSERT INTO messages (room_code, user_id, user_name, content, timestamp)
             VALUES (%s, %s, %s, %s, %s)
         """
         cursor.execute(query, (room_code, user_id, user_name, content, utc_now))
-        # No explicit commit needed due to autocommit=True setting in DB_CONFIG
+        conn.commit()
         success = True
         app.logger.debug(f"Message saved to DB for room '{room_code}'.")
     except pymysql.MySQLError as e:
         app.logger.error(f"DB Error saving message for room '{room_code}' by user {user_name}: {e}")
     except ConnectionError as e:
-         app.logger.error(f"DB Connection Error saving message for room '{room_code}': {e}")
+        app.logger.error(f"DB Connection Error saving message for room '{room_code}': {e}")
     finally:
-        if 'cursor' in locals() and cursor:
-             try: cursor.close()
-             except Exception as cur_e: app.logger.error(f"Error closing save message cursor: {cur_e}")
+        if cursor:
+            try: cursor.close()
+            except Exception as cur_e: app.logger.error(f"Error closing save message cursor: {cur_e}")
+        if conn:
+            try: conn.close()
+            except Exception as conn_e: app.logger.error(f"Error closing save message connection: {conn_e}")
     return success
 
 
@@ -1001,7 +1113,7 @@ def handle_connect():
     if room_code not in rooms:
         if is_valid_room(room_code): # Checks DB history too
              # Room exists in DB but not memory, initialize tracker now
-             rooms[room_code] = {"members": 0, "sids": set()}
+             rooms[room_code] = {"members": 0, "users": set()}
              app.logger.info(f"Initialized in-memory tracker for room '{room_code}' based on DB history check during connect.")
         else:
              app.logger.error(f"Connection REJECTED for SID {sid}: Room '{room_code}' is invalid (not in memory or DB history).")
@@ -1011,11 +1123,13 @@ def handle_connect():
 
     # --- Proceed with joining ---
     join_room(room_code)
-    rooms[room_code]["members"] += 1
-    rooms[room_code]["sids"].add(sid)
-    sid_to_user[sid] = user_name # Store SID -> username mapping
+    was_new_user = user_id not in rooms[room_code]["users"]
+    if was_new_user:
+        rooms[room_code]["users"].add(user_id)
+        rooms[room_code]["members"] += 1
+    sid_to_info[sid] = {'user_id': user_id, 'user_name': user_name, 'room_code': room_code} # Store SID info mapping
 
-    app.logger.info(f"User '{user_name}' (SID: {sid}) successfully CONNECTED to room '{room_code}'. Active members: {rooms[room_code]['members']}.")
+    app.logger.info(f"User '{user_name}' (SID: {sid}) successfully CONNECTED to room '{room_code}'. Active members: {rooms[room_code]['members']}. New user: {was_new_user}")
 
     # Emit the updated user count to everyone in the room
     emit_user_count(room_code)
@@ -1034,18 +1148,22 @@ def handle_connect():
         app.logger.error(f"Error retrieving/sending history for room '{room_code}' to {user_name} (SID: {sid}): {e}", exc_info=True)
         socketio.emit('error', {'message': 'Error loading message history.'}, room=sid)
 
-    # Notify others about the join (exclude the user who just joined)
-    join_message_content = f"{user_name} has joined the room."
-    join_ts = datetime.datetime.now(pytz.utc).isoformat()
-    join_message = {
-        "name": "System",
-        "message": join_message_content,
-        "timestamp": join_ts,
-        "user_id": None, # System messages have no user ID
-        "isSystem": True
-        }
-    socketio.emit('message', join_message, to=room_code, skip_sid=sid) # skip_sid ensures the joiner doesn't get their own join message
-    app.logger.debug(f"Sent join notification for '{user_name}' to room '{room_code}' (skipped SID {sid})")
+    # Notify others about the join ONLY if this is a new user (not a reconnect)
+    if was_new_user:
+        join_message_content = f"{user_name} has joined the room."
+        join_ts = datetime.datetime.now(pytz.utc).isoformat()
+        join_message = {
+            "name": "System",
+            "message": join_message_content,
+            "timestamp": join_ts,
+            "user_id": None, # System messages have no user ID
+            "isSystem": True
+            }
+        socketio.emit('message', join_message, to=room_code, skip_sid=sid) # skip_sid ensures the joiner doesn't get their own join message
+        app.logger.debug(f"Sent join notification for '{user_name}' to room '{room_code}' (skipped SID {sid})")
+
+        # Save join message to database for persistence
+        save_message(room_code, None, "System", join_message_content)
 
     return True # Indicate successful connection
 
@@ -1054,16 +1172,17 @@ def handle_connect():
 def handle_disconnect():
     """Handles client disconnections."""
     sid = request.sid
-    user_name = sid_to_user.pop(sid, "Someone") # Get username and remove from mapping
+    info = sid_to_info.pop(sid, None) # Get info and remove from mapping
 
-    disconnected_room = None
-    # Find which room the SID belonged to
-    for room_code, room_data in rooms.items():
-        if sid in room_data.get("sids", set()):
-            disconnected_room = room_code
-            break
+    if not info:
+        app.logger.debug(f"[Disconnect] SID={sid}. No info found, possibly stale connection.")
+        return
 
-    app.logger.debug(f"[Disconnect] SID={sid}. User='{user_name}'. Found in room: '{disconnected_room}'.")
+    user_id = info['user_id']
+    user_name = info['user_name']
+    disconnected_room = info['room_code']
+
+    app.logger.debug(f"[Disconnect] SID={sid}. User='{user_name}'(ID:{user_id}). Room: '{disconnected_room}'.")
 
     if disconnected_room and disconnected_room in rooms:
         # Formally leave the SocketIO room
@@ -1071,8 +1190,8 @@ def handle_disconnect():
 
         # Update our custom room tracker
         room_info = rooms[disconnected_room]
-        if sid in room_info["sids"]:
-             room_info["sids"].remove(sid)
+        if user_id in room_info["users"]:
+             room_info["users"].remove(user_id)
              room_info["members"] = max(0, room_info["members"] - 1) # Decrement, ensure non-negative
              current_members = room_info["members"]
              app.logger.info(f"User '{user_name}' (SID: {sid}) DISCONNECTED from room '{disconnected_room}'. Remaining members: {current_members}.")
@@ -1092,6 +1211,9 @@ def handle_disconnect():
              # Emit updated user count to the room
              emit_user_count(disconnected_room)
 
+             # Save leave message to database for persistence
+             save_message(disconnected_room, None, "System", leave_message_content)
+
              # Clean up memory for empty PRIVATE rooms
              # Keep PUBLIC room tracker even if empty
              if current_members <= 0 and disconnected_room != "PUBLIC":
@@ -1107,8 +1229,8 @@ def handle_disconnect():
                   app.logger.info(f"Public room '{disconnected_room}' is empty, tracker retained with 0 members.")
 
         else:
-            # SID was not in the sids set, even though it was mapped to the room. This indicates an inconsistency.
-            app.logger.warning(f"Disconnect inconsistency: SID {sid} was mapped to room '{disconnected_room}', but not found in its 'sids' set.")
+            # user_id was not in the users set, even though it was mapped. This indicates an inconsistency.
+            app.logger.warning(f"Disconnect inconsistency: SID {sid} was mapped to room '{disconnected_room}', but user_id {user_id} not found in its 'users' set.")
             # Still try to emit count update as a safety measure
             emit_user_count(disconnected_room)
 
@@ -1142,8 +1264,8 @@ def handle_message(data):
         socketio.emit('error', {'message': 'Cannot send message: Your session is invalid. Please refresh.'}, room=sid)
         return
 
-    # Cross-check: Does the room tracker confirm this SID belongs here?
-    if room_code not in rooms or sid not in rooms[room_code].get("sids", set()):
+    # Cross-check: Does the room tracker confirm this user belongs here?
+    if room_code not in rooms or user_id not in rooms[room_code].get("users", set()):
          app.logger.error(f"Message REJECTED from SID {sid} (User: {user_name}): Session/tracker mismatch for room '{room_code}'. Possible stale session or tracker issue.")
          socketio.emit('error', {'message': 'Room connection mismatch. Please refresh the page.'}, room=sid)
          # Optional: Force disconnect if this happens consistently? disconnect(sid)
@@ -1183,6 +1305,40 @@ def handle_message(data):
     # Broadcast the message to everyone in the room (including the sender)
     socketio.emit('message', content_to_broadcast, to=room_code)
     app.logger.debug(f"Message from '{user_name}' (SID: {sid}) in room '{room_code}' saved and BROADCASTED.")
+
+
+@socketio.on('leave')
+def handle_leave():
+    """Handles leave event from client."""
+    sid = request.sid
+    info = sid_to_info.get(sid)
+    if info:
+        user_id = info['user_id']
+        user_name = info['user_name']
+        disconnected_room = info['room_code']
+        if disconnected_room and disconnected_room in rooms:
+            room_info = rooms[disconnected_room]
+            if user_id in room_info["users"]:
+                room_info["users"].remove(user_id)
+                room_info["members"] = max(0, room_info["members"] - 1)
+                leave_message_content = f"{user_name} has left the room."
+                leave_ts = datetime.datetime.now(pytz.utc).isoformat()
+                leave_message = {
+                    "name": "System",
+                    "message": leave_message_content,
+                    "timestamp": leave_ts,
+                    "user_id": None,
+                    "isSystem": True
+                }
+                socketio.emit('message', leave_message, to=disconnected_room)
+                emit_user_count(disconnected_room)
+                save_message(disconnected_room, None, "System", leave_message_content)
+                if room_info["members"] <= 0 and disconnected_room != "PUBLIC":
+                    del rooms[disconnected_room]
+                    app.logger.info(f"Private room tracker '{disconnected_room}' deleted as it became empty.")
+                elif room_info["members"] <= 0 and disconnected_room == "PUBLIC":
+                    room_info["members"] = 0
+                    app.logger.info(f"Public room '{disconnected_room}' is empty, tracker retained with 0 members.")
 
 
 # --- General Error Handlers ---
@@ -1249,26 +1405,26 @@ def handle_exception(e):
 
 # --- Run the App ---
 if __name__ == "__main__":
-    port = int(os.getenv('PORT', 5000))
+    port = int(os.getenv('PORT', 5001))
     host = os.getenv('HOST', '0.0.0.0') # Listen on all available interfaces
     debug_mode = app.config['DEBUG']
 
-    app.logger.info(f"--- Starting Flask-SocketIO Chat Application ---")
-    app.logger.info(f" Configuration:")
-    app.logger.info(f"   - Host: {host}")
-    app.logger.info(f"   - Port: {port}")
-    app.logger.info(f"   - Debug Mode: {'ON' if debug_mode else 'OFF'}")
-    app.logger.info(f"   - Async Mode: {ASYNC_MODE or 'Werkzeug (Default - Development Only!)'}")
-    app.logger.info(f"   - Database Host: {DB_CONFIG['host']}")
-    app.logger.info(f"   - Database Name: {DB_CONFIG['database']}")
-    app.logger.info(f"-----------------------------------------------")
+    print(f"--- Starting Flask-SocketIO Chat Application ---")
+    print(f" Configuration:")
+    print(f"   - Host: {host}")
+    print(f"   - Port: {port}")
+    print(f"   - Debug Mode: {'ON' if debug_mode else 'OFF'}")
+    print(f"   - Async Mode: {ASYNC_MODE or 'Werkzeug (Default - Development Only!)'}")
+    print(f"   - Database Host: {DB_CONFIG['host']}")
+    print(f"   - Database Name: {DB_CONFIG['database']}")
+    print(f"-----------------------------------------------")
 
     try:
         # use_reloader should ideally be False in production, even if debug is technically True
         # for certain Werkzeug features. Let debug control it simply here.
         socketio.run(app, host=host, port=port, debug=debug_mode, use_reloader=debug_mode)
     except Exception as start_error:
-         app.logger.critical(f"##### APPLICATION FAILED TO START #####: {start_error}", exc_info=True)
+         print(f"##### APPLICATION FAILED TO START #####: {start_error}")
          print(f"\nCRITICAL ERROR: Failed to start application: {start_error}\n", file=sys.stderr)
          sys.exit(1) # Exit with error code
 

@@ -1,58 +1,63 @@
-<!-- START OF FILE index.html -->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Chat App</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
     <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
-    <!-- Google Fonts (Optional) -->
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Animate.css for animations -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
 </head>
-<body>
-    <div class="container auth-container">
-        <div class="header">
-            <h1>Welcome to Chat App</h1>
+<body class="bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 animate__animated animate__fadeInUp">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2 animate__animated animate__bounce">Welcome to Chat App</h1>
+            <p class="text-gray-600">Sign in to your account</p>
         </div>
-        <div class="main">
-            <!-- Flash Messages -->
-            {% include 'includes/_flash_messages.html' %}
-
-            {# Include 'next' URL in form action for redirection after login #}
-            <form action="{{ url_for('login') }}{{ '?next=' + request.args.get('next') | urlencode if request.args.get('next') else '' }}" method="post" class="auth-form">
-                <h2>Log In to Your Account</h2>
-                <div class="form-group">
-                    <label for="email" class="sr-only">Email:</label>
-                    <input id="email" name="email" type="email" placeholder="Email Address" required value="{{ request.form.email or '' }}" autocomplete="email">
-                </div>
-                <div class="form-group">
-                    <label for="password" class="sr-only">Password:</label>
-                    <input id="password" name="password" type="password" placeholder="Password" required autocomplete="current-password">
-                </div>
-                 {# Remember Me Checkbox #}
-                 <div class="form-group form-group-checkbox">
-                     <input type="checkbox" id="remember" name="remember">
-                     <label for="remember">Remember me</label>
-                 </div>
-                <div class="form-group">
-                    <button type="submit" class="btn btn-primary btn-block">Login</button>
-                </div>
-                <div class="form-links">
-                    <a href="{{ url_for('forget_password') }}" id="forget_password">Forgot password?</a>
-                </div>
-
-                <p class="or-separator"><span>Don't have an account?</span></p> {# Changed text slightly #}
-
-                <div class="form-group">
-                     <a href="{{ url_for('register') }}" class="btn btn-secondary btn-block">Create New Account</a>
-                </div>
-            </form>
+        
+        <!-- Flash Messages -->
+        {% include 'includes/_flash_messages.html' %}
+        
+        <form action="{{ url_for('login') }}{{ '?next=' + request.args.get('next') | urlencode if request.args.get('next') else '' }}" method="post" class="space-y-6">
+            <div>
+                <label for="email" class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                <input id="email" name="email" type="email" placeholder="Enter your email" required value="{{ request.form.email or '' }}" autocomplete="email"
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 animate__animated animate__fadeInLeft">
+            </div>
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                <input id="password" name="password" type="password" placeholder="Enter your password" required autocomplete="current-password"
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 animate__animated animate__fadeInRight">
+            </div>
+            <div class="flex items-center">
+                <input type="checkbox" id="remember" name="remember" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                <label for="remember" class="ml-2 block text-sm text-gray-900">Remember me</label>
+            </div>
+            <button type="submit" class="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-4 rounded-lg hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 transform hover:scale-105 animate__animated animate__pulse">
+                Sign In
+            </button>
+        </form>
+        
+        <div class="mt-6 text-center">
+            <a href="{{ url_for('forget_password') }}" class="text-sm text-blue-600 hover:text-blue-500 transition-colors duration-200">Forgot your password?</a>
+        </div>
+        
+        <div class="mt-4 text-center">
+            <p class="text-sm text-gray-600">Don't have an account?</p>
+            <a href="{{ url_for('register') }}" class="inline-block mt-2 w-full bg-gray-100 text-gray-800 py-3 px-4 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all duration-200 transform hover:scale-105">
+                Create New Account
+            </a>
         </div>
     </div>
 </body>
 </html>
-<!-- END OF FILE index.html -->

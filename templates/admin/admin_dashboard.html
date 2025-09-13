@@ -1,49 +1,73 @@
-<!-- START OF FILE admin/admin_dashboard.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Chat App</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
     <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
-    <!-- Google Fonts (Optional) -->
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Animate.css for animations -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
 </head>
-<body>
-    <div class="container admin-container"> <!-- Use wider admin container style -->
-        <div class="header">
-            <h1>Admin Dashboard</h1>
-            <div class="header-links">
-                <span>Admin: {{ username | e }}</span> |
-                <a href="{{ url_for('dashboard') }}" title="Go to Main User Dashboard">Main Dashboard</a> |
-                <a href="{{ url_for('logout') }}">Logout</a>
-            </div>
-        </div>
-        <div class="main">
+<body class="bg-gradient-to-br from-slate-500 via-gray-500 to-zinc-500 min-h-screen">
+    <div class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-8 animate__animated animate__fadeInUp">
+            <!-- Header -->
+            <header class="flex justify-between items-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-800 animate__animated animate__bounce">Admin Dashboard</h1>
+                <div class="flex items-center space-x-4">
+                    <span class="text-gray-600">Admin: <span class="font-semibold text-gray-800">{{ username | e }}</span></span>
+                    <a href="{{ url_for('dashboard') }}" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors duration-200 transform hover:scale-105">Main Dashboard</a>
+                    <a href="{{ url_for('logout') }}" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors duration-200 transform hover:scale-105">Logout</a>
+                </div>
+            </header>
+
             <!-- Flash Messages -->
             {% include 'includes/_flash_messages.html' %}
 
-            <h2>Administration Panel</h2>
-            <p>Welcome to the admin area. Use the links below to manage the application.</p>
-
-            <div class="admin-nav section-box">
-                 <a href="{{ url_for('admin_users') }}" class="btn btn-primary">Manage Users</a>
-                 <!-- Future Admin Links Placeholder -->
-                 {# <a href="#" class="btn btn-secondary disabled">Manage Rooms (Future)</a> #}
-                 {# <a href="#" class="btn btn-secondary disabled">View Logs (Future)</a> #}
+            <div class="mb-8">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Administration Panel</h2>
+                <p class="text-gray-600">Welcome to the admin area. Use the links below to manage the application.</p>
             </div>
 
-             <div class="section-box">
-                <h3>Application Stats</h3>
-                {# Display stats passed from the route #}
-                <p><strong>Total Registered Users:</strong> {{ user_count if user_count is not none else 'N/A' }}</p>
-                <p><strong>Currently Active Rooms (in memory):</strong> {{ active_room_count if active_room_count is not none else 'N/A' }}</p>
-                {# Add more stats here if needed - e.g., message count #}
+            <!-- Admin Navigation -->
+            <div class="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl p-6 shadow-lg mb-8 animate__animated animate__fadeInLeft">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Management Tools</h3>
+                <div class="flex space-x-4">
+                    <a href="{{ url_for('admin_users') }}" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-all duration-200 transform hover:scale-105 animate__animated animate__pulse">
+                        Manage Users
+                    </a>
+                    <a href="{{ url_for('admin_rooms') }}" class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg transition-all duration-200 transform hover:scale-105 animate__animated animate__pulse">
+                        Manage Rooms
+                    </a>
+                    <!-- Future links -->
+                    <!-- <a href="#" class="bg-gray-300 text-gray-500 px-6 py-3 rounded-lg cursor-not-allowed">View Logs (Future)</a> -->
+                </div>
             </div>
 
+            <!-- Application Stats -->
+            <div class="bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl p-6 shadow-lg animate__animated animate__fadeInRight">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Application Stats</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <p class="text-sm text-gray-600">Total Registered Users</p>
+                        <p class="text-2xl font-bold text-gray-800">{{ user_count if user_count is not none else 'N/A' }}</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <p class="text-sm text-gray-600">Currently Active Rooms</p>
+                        <p class="text-2xl font-bold text-gray-800">{{ active_room_count if active_room_count is not none else 'N/A' }}</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </body>

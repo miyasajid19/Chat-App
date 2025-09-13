@@ -1,56 +1,65 @@
-<!-- START OF FILE register.html -->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register - Chat App</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
     <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
-    <!-- Google Fonts (Optional) -->
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Animate.css for animations -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
 </head>
-<body>
-    <div class="container auth-container">
-        <div class="header">
-            <h1>Create Chat App Account</h1>
+<body class="bg-gradient-to-br from-green-500 via-blue-500 to-purple-500 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 animate__animated animate__fadeInUp">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2 animate__animated animate__bounce">Create Your Account</h1>
+            <p class="text-gray-600">Join the Chat App community</p>
         </div>
-        <div class="main">
-             <!-- Flash Messages -->
-            {% include 'includes/_flash_messages.html' %}
-
-            <form action="{{ url_for('register') }}" method="post" class="auth-form">
-                <h2>Sign Up</h2>
-                <p>Create an account to join the chat rooms.</p>
-
-                <div class="form-group">
-                     <label for="name" class="sr-only">Username:</label>
-                    <input id="name" name="name" type="text" placeholder="Choose a Username" required value="{{ request.form.name or '' }}" autocomplete="username">
-                </div>
-                <div class="form-group">
-                    <label for="email" class="sr-only">Email:</label>
-                    <input id="email" name="email" type="email" placeholder="Enter your Email Address" required value="{{ request.form.email or '' }}" autocomplete="email">
-                </div>
-                <div class="form-group">
-                    <label for="password" class="sr-only">Password:</label>
-                    <input id="password" name="password" type="password" placeholder="Create a Password (min. 6 characters)" required minlength="6" autocomplete="new-password">
-                    {# Note: confirm password field might be a good addition #}
-                </div>
-                <div class="form-group">
-                    <button type="submit" class="btn btn-primary btn-block">Register</button>
-                </div>
-
-                <p class="or-separator"><span>Already have an account?</span></p> {# Changed text #}
-
-                 <div class="form-group">
-                    <a href="{{ url_for('home') }}" class="btn btn-secondary btn-block">Log In Instead</a>
-                 </div>
-            </form>
+        
+        <!-- Flash Messages -->
+        {% include 'includes/_flash_messages.html' %}
+        
+        <form action="{{ url_for('register') }}" method="post" class="space-y-6">
+            <div>
+                <label for="name" class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                <input id="name" name="name" type="text" placeholder="Choose a unique username" required value="{{ request.form.name or '' }}" autocomplete="username"
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 animate__animated animate__fadeInLeft">
+            </div>
+            <div>
+                <label for="email" class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                <input id="email" name="email" type="email" placeholder="Enter your email" required value="{{ request.form.email or '' }}" autocomplete="email"
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 animate__animated animate__fadeInRight">
+            </div>
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                <input id="password" name="password" type="password" placeholder="Create a strong password (min. 6 characters)" required minlength="6" autocomplete="new-password"
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 animate__animated animate__fadeInLeft">
+            </div>
+            <div>
+                <label for="confirm_password" class="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
+                <input id="confirm_password" name="confirm_password" type="password" placeholder="Confirm your password" required minlength="6" autocomplete="new-password"
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 animate__animated animate__fadeInRight">
+            </div>
+            <button type="submit" class="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 px-4 rounded-lg hover:from-green-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200 transform hover:scale-105 animate__animated animate__pulse">
+                Create Account
+            </button>
+        </form>
+        
+        <div class="mt-6 text-center">
+            <p class="text-sm text-gray-600">Already have an account?</p>
+            <a href="{{ url_for('home') }}" class="inline-block mt-2 w-full bg-gray-100 text-gray-800 py-3 px-4 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all duration-200 transform hover:scale-105">
+                Sign In Instead
+            </a>
         </div>
     </div>
 </body>
 </html>
-<!-- END OF FILE register.html -->

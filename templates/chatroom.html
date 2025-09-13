@@ -7,54 +7,61 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat Room - {{ room_code }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
     <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
-    <!-- Google Fonts (Optional) -->
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Animate.css for animations -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
 </head>
 
-<body>
-    <div class="container chat-container">
-        <div class="header">
-            <div class="chat-header-info">
-                <!-- User Count Display -->
-                Users: <span id="user-count-display" class="user-count-display">?</span>
-            </div>
-            <h1>Private Chat</h1>
-            <div class="header-links">
-                <a href="{{ url_for('dashboard') }}" title="Leave Room & Go to Dashboard">Dashboard</a>
-            </div>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-white shadow-md p-4 flex justify-between items-center animate__animated animate__fadeInDown">
+        <div class="flex items-center space-x-4">
+            <h1 class="text-2xl font-bold text-gray-800">Private Chat</h1>
+            <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">Room: <span class="font-bold">{{ room_code }}</span></span>
         </div>
-        <div class="main">
-            <!-- Display Room Code prominently -->
-            <h2 class="room-code-display">Room Code: <span class="code">{{ room_code }}</span></h2>
+        <div class="flex items-center space-x-4">
+            <span class="text-gray-600">Users: <span id="user-count-display" class="font-bold text-blue-600">?</span></span>
+            <a href="{{ url_for('dashboard') }}" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors duration-200 transform hover:scale-105">Leave Room</a>
+        </div>
+    </header>
 
-            <!-- Messages Area -->
-            <div class="messages" id="messages">
+    <!-- Main Chat Area -->
+    <div class="flex-1 flex overflow-hidden">
+        <!-- Messages Area -->
+        <div class="flex-1 flex flex-col">
+            <div class="flex-1 overflow-y-auto p-4 space-y-4" id="messages">
                 <!-- System message area/Initial loading message -->
-                <div class="system-message status-indicator">Connecting...</div>
+                <div class="text-center text-gray-500 animate__animated animate__fadeIn">Connecting...</div>
             </div>
-
-            <!-- Floating Flash Messages Area (for SocketIO errors etc.) -->
-            <div id="chat-flash-messages"></div>
 
             <!-- Message Input Area -->
-            <form class="send_message" id="message-form">
-                <label for="message" class="sr-only">Message:</label>
-                <textarea id="message" name="message" placeholder="Type your message..." aria-label="Type your message"
-                    rows="1" disabled></textarea> {# Start disabled until connected #}
-                <button type="submit" id="send-btn" aria-label="Send Message" disabled> {# Start disabled #}
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                        class="bi bi-send-fill" viewBox="0 0 16 16">
-                        <path
-                            d="M15.964.686a.5.5 0 0 0-.65-.65L.767 5.855H.766l-.452.18a.5.5 0 0 0-.082.887l.41.26.001.002 4.995 3.178 3.178 4.995.002.001.26.41a.5.5 0 0 0 .886-.083l6-15Zm-1.833 1.89L6.637 10.07l-.215-.338a.5.5 0 0 0-.154-.154l-.338-.215 7.494-7.494 1.178-.471-.47 1.178Z" />
-                    </svg>
-                </button>
-            </form>
+            <div class="bg-white border-t p-4">
+                <form class="flex space-x-4" id="message-form">
+                    <textarea id="message" name="message" placeholder="Type your message..." rows="1" disabled
+                              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none max-h-24 transition-all duration-200 animate__animated animate__fadeInUp"></textarea>
+                    <button type="submit" id="send-btn" disabled
+                            class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed animate__animated animate__pulse">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-send-fill" viewBox="0 0 16 16">
+                            <path d="M15.964.686a.5.5 0 0 0-.65-.65L.767 5.855H.766l-.452.18a.5.5 0 0 0-.082.887l.41.26.001.002 4.995 3.178 3.178 4.995.002.001.26.41a.5.5 0 0 0 .886-.083l6-15Zm-1.833 1.89L6.637 10.07l-.215-.338a.5.5 0 0 0-.154-.154l-.338-.215 7.494-7.494 1.178-.471-.47 1.178Z"/>
+                        </svg>
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
+
+    <!-- Floating Flash Messages Area -->
+    <div id="chat-flash-messages" class="fixed top-4 right-4 space-y-2 z-50"></div>
 
     <!-- Socket.IO Client Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
@@ -98,35 +105,24 @@
             const safeMsg = sanitize(message); // Sanitize message content
             const formattedTime = formatTimestamp(timestamp);
 
-            messageElement.classList.add("message-item");
-
             if (isSystem) {
-                messageElement.classList.add("system-message");
-                messageElement.innerHTML = `<span class="message-content">${safeMsg}</span>`;
-                // Note: System messages have animation via the class directly
+                messageElement.className = "text-center text-gray-500 italic animate__animated animate__fadeIn";
+                messageElement.innerHTML = `<span>${safeMsg}</span>`;
             } else {
+                messageElement.className = `flex ${name === currentUser ? 'justify-end' : 'justify-start'} mb-4 animate__animated animate__fadeInUp`;
+                
                 const messageBubble = document.createElement("div");
-                messageBubble.classList.add("message-bubble");
-
-                // Conditionally add sender name for received messages
-                const senderSpan = (name !== currentUser) ? `<strong class="message-sender">${safeName}</strong>` : '';
-                const contentSpan = `<span class="message-content">${safeMsg}</span>`;
-                messageBubble.innerHTML = senderSpan + contentSpan;
-
-                const timestampSpan = `<span class="message-timestamp">${formattedTime}</span>`;
-
+                messageBubble.className = `max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${name === currentUser ? 'bg-blue-500 text-white' : 'bg-white text-gray-800 border'}`;
+                
+                const senderSpan = (name !== currentUser) ? `<strong class="block text-xs text-gray-600 mb-1">${safeName}</strong>` : '';
+                const contentSpan = `<span>${safeMsg}</span>`;
+                const timestampSpan = `<span class="block text-xs ${name === currentUser ? 'text-blue-200' : 'text-gray-500'} mt-1">${formattedTime}</span>`;
+                
+                messageBubble.innerHTML = senderSpan + contentSpan + timestampSpan;
                 messageElement.appendChild(messageBubble);
-                messageElement.insertAdjacentHTML('beforeend', timestampSpan); // Timestamp below bubble
-
-                if (name === currentUser) {
-                    messageElement.classList.add("sent-message");
-                } else {
-                    messageElement.classList.add("received-message");
-                }
             }
 
             messageContainer.appendChild(messageElement);
-             // Animation handled by CSS via message-item opacity + transform + keyframes
         };
 
 
@@ -143,13 +139,19 @@
 
         const showFlashMessage = (message, category = 'info') => {
             const flashElement = document.createElement('div');
-            const alertCategory = (category === 'error') ? 'danger' : category; // Map 'error' to 'danger'
-            flashElement.className = `alert alert-${alertCategory}`;
+            const colorClasses = {
+                'info': 'bg-blue-500 text-white',
+                'success': 'bg-green-500 text-white',
+                'warning': 'bg-yellow-500 text-white',
+                'error': 'bg-red-500 text-white',
+                'danger': 'bg-red-500 text-white'
+            };
+            flashElement.className = `px-4 py-2 rounded-lg shadow-lg ${colorClasses[category] || colorClasses['info']} animate__animated animate__fadeInRight`;
             flashElement.textContent = sanitize(message); // Sanitize flash message
             chatFlashContainer.appendChild(flashElement);
             // Add fade-out animation using class toggle after a delay
             setTimeout(() => {
-                flashElement.classList.add('fade-out');
+                flashElement.classList.add('animate__fadeOutRight');
                 // Remove element after animation completes
                 setTimeout(() => flashElement.remove(), 600); // Corresponds to transition duration
             }, 4000); // Start fading after 4 seconds
@@ -170,8 +172,8 @@
         const showStatusMessage = (message, isError = false) => {
             messageContainer.innerHTML = ''; // Clear previous messages/status
             const statusElement = document.createElement('div');
-            statusElement.className = `system-message status-indicator ${isError ? 'alert-danger' : ''}`;
-            statusElement.innerHTML = `<span class="message-content">${sanitize(message)}</span>`;
+            statusElement.className = `text-center ${isError ? 'text-red-500' : 'text-gray-500'} italic animate__animated animate__fadeIn`;
+            statusElement.innerHTML = `<span>${sanitize(message)}</span>`;
             messageContainer.appendChild(statusElement);
         };
 
@@ -284,6 +286,10 @@
             autoResizeTextarea();
             // Status message is set initially in HTML
             // SocketIO connects automatically. 'connect' handler enables input.
+        });
+
+        window.addEventListener('beforeunload', () => {
+            socketio.emit('leave');
         });
 
     </script>

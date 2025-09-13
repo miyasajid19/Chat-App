@@ -1,33 +1,47 @@
-<!-- START OF FILE 500.html -->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>500 Server Error - Chat App</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
     <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
-    <!-- Google Fonts (Optional) -->
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Animate.css for animations -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
 </head>
-<body>
-    <div class="container error-container">
-        <div class="header"><h1>500 - Internal Server Error</h1></div>
-        <div class="main">
-            <p style="font-size: 1.1em; color: var(--muted-color);">Oops! Something went wrong on our end.</p>
+<body class="bg-gradient-to-br from-red-500 via-red-600 to-red-700 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center animate__animated animate__fadeInUp">
+        <div class="mb-8">
+            <h1 class="text-6xl font-bold text-gray-800 mb-4 animate__animated animate__bounce">500</h1>
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Internal Server Error</h2>
+            <p class="text-gray-600 mb-6">Oops! Something went wrong on our end.</p>
             {% if error_message %}
-                <p><strong>Details:</strong> <span style="color: var(--danger-color);">{{ error_message }}</span></p>
+                <p class="text-red-600 font-medium">Details: {{ error_message }}</p>
             {% else %}
-                <p>We've logged the issue and are working to fix it. Please try again later.</p>
+                <p class="text-gray-600">We've logged the issue and are working to fix it. Please try again later.</p>
             {% endif %}
-             <div class="error-actions">
-                <a href="{{ url_for('home') }}" class="btn btn-primary">Go to Homepage</a>
-                 {% if 'user_id' in session %}
-                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Go to Dashboard</a>
-                {% endif %}
+        </div>
+        <div class="space-y-4">
+            <a href="{{ url_for('home') }}" class="inline-block w-full bg-gradient-to-r from-red-600 to-red-700 text-white py-3 px-4 rounded-lg hover:from-red-700 hover:to-red-800 transition-all duration-200 transform hover:scale-105 animate__animated animate__pulse">
+                Go to Homepage
+            </a>
+            {% if 'user_id' in session %}
+            <a href="{{ url_for('dashboard') }}" class="inline-block w-full bg-gray-100 text-gray-800 py-3 px-4 rounded-lg hover:bg-gray-200 transition-all duration-200 transform hover:scale-105">
+                Go to Dashboard
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</body>
             </div>
         </div>
     </div>
