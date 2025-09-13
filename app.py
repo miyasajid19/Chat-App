@@ -195,9 +195,16 @@ def ensure_admin_user():
     """Creates or updates the specified admin user."""
     # !!! SECURITY WARNING: Storing credentials like this is NOT recommended for production.
     # Consider a setup script or environment variables only.
-    admin_email = "smpk@smpk.com"
-    admin_pass = "407432"
-    admin_name = "SMPK Admin"
+    # Prefer explicit environment variables (do not rely on undefined `env` object)
+    admin_email = os.getenv('ADMIN_EMAIL', '').strip().lower() or None
+    admin_pass = os.getenv('ADMIN_PASSWORD') or None
+    # Default admin name to provided ADMIN_NAME or derive from email local-part or fallback to 'Administrator'
+    admin_name = (os.getenv('ADMIN_NAME') or (admin_email.split('@')[0] if admin_email else 'Administrator')).strip()
+
+    # Basic validation: if required credentials are missing, skip creating/updating admin and log a warning.
+    if not admin_email or not admin_pass:
+        print("WARNING: ADMIN_EMAIL and/or ADMIN_PASSWORD not set. Skipping admin user creation. Set these in the environment to enable automatic admin provisioning.")
+        return
 
     print(f"Ensuring admin user '{admin_email}' exists and is configured...")
     try:
